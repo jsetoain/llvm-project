@@ -30,3 +30,9 @@ add_mlir_dialect(LLVMAVX512 llvm_avx512 LLVMAVX512)
 set(LLVM_TARGET_DEFINITIONS LLVMAVX512.td)
 mlir_tablegen(LLVMAVX512Conversions.inc -gen-llvmir-conversions)
 add_public_tablegen_target(MLIRLLVMAVX512ConversionsIncGen)
+
+add_mlir_dialect(LLVMSVE llvm_sve LLVMSVE)
+
+set(LLVM_TARGET_DEFINITIONS LLVMSVE.td)
+mlir_tablegen(LLVMSVEConversions.inc -gen-llvmir-conversions)
+add_public_tablegen_target(MLIRLLVMSVEConversionsIncGen)

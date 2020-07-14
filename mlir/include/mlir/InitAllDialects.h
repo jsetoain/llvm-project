@@ -20,6 +20,7 @@
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMAVX512Dialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/LLVMIR/LLVMSVEDialect.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -33,6 +34,7 @@
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/SVE/SVEDialect.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/Dialect.h"
@@ -49,6 +51,7 @@ inline void registerAllDialects(DialectRegistry &registry) {
                   gpu::GPUDialect,
                   LLVM::LLVMAVX512Dialect,
                   LLVM::LLVMDialect,
+                  LLVM::LLVMSVEDialect,
                   linalg::LinalgDialect,
                   scf::SCFDialect,
                   omp::OpenMPDialect,
@@ -57,6 +60,7 @@ inline void registerAllDialects(DialectRegistry &registry) {
                   quant::QuantizationDialect,
                   spirv::SPIRVDialect,
                   StandardOpsDialect,
+                  sve::SVEDialect,
                   vector::VectorDialect,
                   NVVM::NVVMDialect,
                   ROCDL::ROCDLDialect,

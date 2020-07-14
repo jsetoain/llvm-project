@@ -94,3 +94,22 @@ add_mlir_translation_library(MLIRTargetROCDLIR
   MLIRROCDLIR
   MLIRTargetLLVMIRModuleTranslation
   )
+
+add_mlir_translation_library(MLIRTargetSVE
+  LLVMIR/LLVMSVEIntr.cpp
+
+  ADDITIONAL_HEADER_DIRS
+  ${MLIR_MAIN_INCLUDE_DIR}/mlir/Target/LLVMIR
+
+  DEPENDS
+  MLIRLLVMSVEConversionsIncGen
+
+  LINK_COMPONENTS
+  Core
+
+  LINK_LIBS PUBLIC
+  MLIRIR
+  MLIRLLVMSVE
+  MLIRLLVMIR
+  MLIRTargetLLVMIRModuleTranslation
+  )

@@ -380,6 +380,17 @@ def ConvertStandardToSPIRV : Pass<"convert-std-to-spirv", "ModuleOp"> {
 }
 
 //===----------------------------------------------------------------------===//
+// SVEToLLVM
+//===----------------------------------------------------------------------===//
+
+def ConvertSVEToLLVM : Pass<"convert-sve-to-llvm", "ModuleOp"> {
+  let summary = "Convert the operations from the sve dialect into the LLVM "
+                "dialect";
+  let constructor = "mlir::createConvertSVEToLLVMPass()";
+  let dependentDialects = ["LLVM::LLVMDialect", "LLVM::LLVMSVEDialect"];
+}
+
+//===----------------------------------------------------------------------===//
 // VectorToSCF
 //===----------------------------------------------------------------------===//
 
