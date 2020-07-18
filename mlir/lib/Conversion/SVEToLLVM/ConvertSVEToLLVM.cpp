@@ -17,7 +17,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
-#include "mlir/IR/Module.h"
+#include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
@@ -27,15 +27,15 @@ using namespace mlir::sve;
 
 template <typename OpTy>
 static Type getSrc1VectorElementType(OpTy op) {
-  return op.src1().getType().template cast<VectorType>().getElementType();
+  return op.src1().getType().template cast<ScalableVectorType>().getElementType();
 }
 template <typename OpTy>
 static Type getSrc2VectorElementType(OpTy op) {
-  return op.src2().getType().template cast<VectorType>().getElementType();
+  return op.src2().getType().template cast<ScalableVectorType>().getElementType();
 }
 template <typename OpTy>
 static Type getAccVectorElementType(OpTy op) {
-  return op.acc().getType().template cast<VectorType>().getElementType();
+  return op.acc().getType().template cast<ScalableVectorType>().getElementType();
 }
 
 /// TODO: This requires changes for scalable vectors
@@ -175,7 +175,7 @@ struct UdotOpConversion : public ConvertToLLVMPattern {
 
 /// Populate the given list with patterns that convert from SVE to LLVM.
 void mlir::populateSVEToLLVMConversionPatterns(
-    LLVMTypeConverter &converter, OwningRewritePatternList &patterns) {
+    SVETypeConverter &converter, OwningRewritePatternList &patterns) {
   MLIRContext *ctx = converter.getDialect()->getContext();
   // clang-format off
   patterns.insert<UmmlaOpConversion,
@@ -192,20 +192,54 @@ struct ConvertSVEToLLVMPass
 };
 } // namespace
 
+// Extract an LLVM IR type from the LLVM IR dialect type.
+static LLVM::LLVMType unwrap(Type type) {
+  if (!type)
+    return nullptr;
+  auto *mlirContext = type.getContext();
+  auto wrappedLLVMType = type.dyn_cast<LLVM::LLVMType>();
+  if (!wrappedLLVMType)
+    emitError(UnknownLoc::get(mlirContext),
+              "conversion resulted in a non-LLVM type");
+  return wrappedLLVMType;
+}
+
+static Optional<Type> convertScalableVectorType(ScalableVectorType svType,
+                                        LLVMTypeConverter &converter)
+{
+  auto elementType = unwrap(converter.convertType(svType.getElementType()));
+  if (!elementType)
+    return {};
+  // TODO: Force 1D vector
+  auto sVectorType = LLVM::LLVMScalableVectorType::get(elementType,
+                                                  svType.getShape().back());
+/*  auto shape = svType.getShape();
+  for (int i = shape.size() - 2; i >= 0; --i)
+    sVectorType = LLVM::LLVMType::getArrayTy(sVectorType, shape[i]);*/
+  return sVectorType;
+}
+
+SVETypeConverter::SVETypeConverter(MLIRContext *ctx)
+  : LLVMTypeConverter(ctx) {
+    addConversion([this](ScalableVectorType svType) {
+      return convertScalableVectorType(svType, *this);
+    });
+}
+
 void ConvertSVEToLLVMPass::runOnOperation() {
   // Convert to the LLVM IR dialect.
   OwningRewritePatternList patterns;
-  LLVMTypeConverter converter(&getContext());
-  populateSVEToLLVMConversionPatterns(converter, patterns);
-  // TODO: We will need specific conversions from scalable vectors
-  populateVectorToLLVMConversionPatterns(converter, patterns);
-  populateStdToLLVMConversionPatterns(converter, patterns);
+  SVETypeConverter sveConverter(&getContext());
+  populateSVEToLLVMConversionPatterns(sveConverter, patterns);
+  populateVectorToLLVMConversionPatterns(sveConverter, patterns);
+  populateStdToLLVMConversionPatterns(sveConverter, patterns);
 
   ConversionTarget target(getContext());
   target.addLegalDialect<LLVM::LLVMDialect>();
   target.addLegalDialect<LLVM::LLVMSVEDialect>();
   target.addIllegalDialect<sve::SVEDialect>();
-  if (failed(applyPartialConversion(getOperation(), target, patterns))) {
+  if (failed(applyPartialConversion(getOperation(), target,
+                                    std::move(patterns)))) {
     signalPassFailure();
   }
 }

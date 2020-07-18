@@ -27,9 +27,5 @@ void LLVM::LLVMSVEDialect::initialize() {
       >();
 }
 
-namespace mlir {
-namespace LLVM {
 #define GET_OP_CLASSES
 #include "mlir/Dialect/LLVMIR/LLVMSVE.cpp.inc"
-} // namespace LLVM
-} // namespace mlir

@@ -21,8 +21,36 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def SVE_Dialect : Dialect {
   let name = "sve";
-  let cppNamespace = "sve";
+  let cppNamespace = "::mlir::sve";
+  let summary = "Basic dialect to target Arm SVE architectures";
+  let description = [{
+    This dialect contains the definitions necessary to target SVE scalable
+    vector operations, including a scalable vector type and intrinsics for
+    some SVE instructions.
+  }];
 }
+
+//===----------------------------------------------------------------------===//
+// SVE scalable vector type definition
+//===----------------------------------------------------------------------===//
+
+def SVE_ScalableVectorType : DialectType<SVE_Dialect,
+    CPred<"$_self.isa<ScalableVectorType>()">,
+              "scalable vector type">,
+    BuildableType<"$_builder.getType<ScalableVectorType>()"> {
+  let typeDescription = [{
+    `sve.vector` represents vectors that will be processed by an scalable
+    vector architecture.
+  }];
+}
+
+def IsScalableVectorTypePred :
+    CPred<"$_self.isa<::mlir::sve::ScalableVectorType>()">;
+
+class ScalableVectorOf<list<Type> allowedTypes> :
+    ContainerType<AnyTypeOf<allowedTypes>, IsScalableVectorTypePred,
+              "$_self.cast<::mlir::sve::ScalableVectorType>().getElementType()",
+              "scalable vector">;
 
 //===----------------------------------------------------------------------===//
 // SVE op definitions
@@ -44,11 +72,11 @@ def UmmlaOp : SVE_Op<"ummla",
   }];
   // Supports vector<16xi8>.
   let arguments = (ins
-          VectorOf<[UI32]>:$acc,
-          VectorOf<[UI8]>:$src1,
-          VectorOf<[UI8]>:$src2
+          ScalableVectorOf<[UI32]>:$acc,
+          ScalableVectorOf<[UI8]>:$src1,
+          ScalableVectorOf<[UI8]>:$src2
   );
-  let results = (outs VectorOf<[UI32]>:$dst);
+  let results = (outs ScalableVectorOf<[UI32]>:$dst);
   let assemblyFormat =
     "$acc `,` $src1 `,` $src2 attr-dict `:` type($src1) `->` type($dst)";
 }
@@ -66,11 +94,11 @@ def SmmlaOp : SVE_Op<"smmla",
   }];
   // Supports vector<16 x i8>.
   let arguments = (ins
-          VectorOf<[SI32]>:$acc,
-          VectorOf<[SI8]>:$src1,
-          VectorOf<[SI8]>:$src2
+          ScalableVectorOf<[SI32]>:$acc,
+          ScalableVectorOf<[SI8]>:$src1,
+          ScalableVectorOf<[SI8]>:$src2
   );
-  let results = (outs VectorOf<[SI32]>:$dst);
+  let results = (outs ScalableVectorOf<[SI32]>:$dst);
   let assemblyFormat =
     "$acc `,` $src1 `,` $src2 attr-dict `:` type($src1) `->` type($dst)";
 }
@@ -88,11 +116,11 @@ def SdotOp : SVE_Op<"sdot",
   }];
   // Supports vector<16xi8> and vector<8xi16>.
   let arguments = (ins
-          VectorOf<[SI32, SI64]>:$acc,
-          VectorOf<[SI8, SI16]>:$src1,
-          VectorOf<[SI8, SI16]>:$src2
+          ScalableVectorOf<[SI32, SI64]>:$acc,
+          ScalableVectorOf<[SI8, SI16]>:$src1,
+          ScalableVectorOf<[SI8, SI16]>:$src2
   );
-  let results = (outs VectorOf<[SI32, SI64]>:$dst);
+  let results = (outs ScalableVectorOf<[SI32, SI64]>:$dst);
   let assemblyFormat =
     "$acc `,` $src1 `,` $src2 attr-dict `:` type($src1) `->` type($dst)";
 }
@@ -110,11 +138,11 @@ def UdotOp : SVE_Op<"udot",
   }];
   // Supports vector<16xi8> and vector<8xi16>.
   let arguments = (ins
-          VectorOf<[UI32, UI64]>:$acc,
-          VectorOf<[UI8, UI16]>:$src1,
-          VectorOf<[UI8, UI16]>:$src2
+          ScalableVectorOf<[UI32, UI64]>:$acc,
+          ScalableVectorOf<[UI8, UI16]>:$src1,
+          ScalableVectorOf<[UI8, UI16]>:$src2
   );
-  let results = (outs VectorOf<[UI32, UI64]>:$dst);
+  let results = (outs ScalableVectorOf<[UI32, UI64]>:$dst);
   let assemblyFormat =
     "$acc `,` $src1 `,` $src2 attr-dict `:` type($src1) `->` type($dst)";
 }

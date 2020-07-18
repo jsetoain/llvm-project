@@ -10,6 +10,7 @@
 #define MLIR_EDGE_CONVERSION_SVETOLLVM_CONVERTSVETOLLVM_H_
 
 #include <memory>
+#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 
 namespace mlir {
 class LLVMTypeConverter;
@@ -17,8 +18,17 @@ class ModuleOp;
 template <typename T> class OperationPass;
 class OwningRewritePatternList;
 
+//===----------------------------------------------------------------------===//
+// SVE Scalar Vector Type Conversion
+//===----------------------------------------------------------------------===//
+
+class SVETypeConverter : public LLVMTypeConverter {
+public:
+  explicit SVETypeConverter(MLIRContext *ctx);
+};
+
 /// Collect a set of patterns to convert from the SVE dialect to LLVM.
-void populateSVEToLLVMConversionPatterns(LLVMTypeConverter &converter,
+void populateSVEToLLVMConversionPatterns(SVETypeConverter &converter,
                                             OwningRewritePatternList &patterns);
 
 /// Create a pass to convert SVE operations to the LLVMIR dialect.
