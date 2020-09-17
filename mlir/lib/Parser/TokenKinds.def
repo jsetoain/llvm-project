@@ -110,6 +110,7 @@ TOK_KEYWORD(tuple)
 TOK_KEYWORD(type)
 TOK_KEYWORD(unit)
 TOK_KEYWORD(vector)
+TOK_KEYWORD(vscale)
 
 #undef TOK_MARKER
 #undef TOK_IDENTIFIER

@@ -210,7 +210,10 @@ LLVMType LLVMType::getStructTy(MLIRContext *context,
   return LLVMStructType::getLiteral(context, elements, isPacked);
 }
 
-LLVMType LLVMType::getVectorTy(LLVMType elementType, unsigned numElements) {
+LLVMType LLVMType::getVectorTy(LLVMType elementType, unsigned numElements,
+                               bool scalable) {
+  if (scalable)
+    return LLVMScalableVectorType::get(elementType, numElements);
   return LLVMFixedVectorType::get(elementType, numElements);
 }
 

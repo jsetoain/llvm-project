@@ -263,18 +263,22 @@ bool ShapedType::hasStaticShape(ArrayRef<int64_t> shape) const {
 // VectorType
 //===----------------------------------------------------------------------===//
 
-VectorType VectorType::get(ArrayRef<int64_t> shape, Type elementType) {
-  return Base::get(elementType.getContext(), shape, elementType);
+VectorType VectorType::get(ArrayRef<int64_t> shape, Type elementType,
+                           bool scalable) {
+  return Base::get(elementType.getContext(), shape, elementType,
+                   static_cast<uint8_t>(scalable));
 }
 
 VectorType VectorType::getChecked(ArrayRef<int64_t> shape, Type elementType,
-                                  Location location) {
-  return Base::getChecked(location, shape, elementType);
+                                  Location location, bool scalable) {
+  return Base::getChecked(location, shape, elementType,
+                          static_cast<uint8_t>(scalable));
 }
 
 LogicalResult VectorType::verifyConstructionInvariants(Location loc,
                                                        ArrayRef<int64_t> shape,
-                                                       Type elementType) {
+                                                       Type elementType,
+                                                       bool scalable) {
   if (shape.empty())
     return emitError(loc, "vector types must have at least one dimension");
 
@@ -284,10 +288,15 @@ LogicalResult VectorType::verifyConstructionInvariants(Location loc,
   if (any_of(shape, [](int64_t i) { return i <= 0; }))
     return emitError(loc, "vector types must have positive constant sizes");
 
+//  if (scalable && shape.size() > 1)
+//    return emitError(loc, "scalable vector types must be 1D");
+
   return success();
 }
 
 ArrayRef<int64_t> VectorType::getShape() const { return getImpl()->getShape(); }
+
+bool VectorType::isScalable() const { return getImpl()->isScalable(); }
 
 //===----------------------------------------------------------------------===//
 // TensorType

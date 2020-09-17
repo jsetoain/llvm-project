@@ -437,9 +437,10 @@ Type Parser::parseTupleType() {
 
 /// Parse a vector type.
 ///
-///   vector-type ::= `vector` `<` non-empty-static-dimension-list type `>`
-///   non-empty-static-dimension-list ::= decimal-literal `x`
-///                                       static-dimension-list
+///   vector-type ::= `vector` `<` scale non-empty-static-dim-list type `>`
+///   scale ::= (`vscale` `x`)?
+///   non-empty-static-dim-list ::= decimal-literal `x`
+///                                 static-dimension-list
 ///   static-dimension-list ::= (decimal-literal `x`)*
 ///
 VectorType Parser::parseVectorType() {
@@ -447,6 +448,11 @@ VectorType Parser::parseVectorType() {
 
   if (parseToken(Token::less, "expected '<' in vector type"))
     return nullptr;
+
+  // Check for scale dimension
+  bool scalable = false;
+  if (!parseScaleIdentifierInDimensionList())
+    scalable = true;
 
   SmallVector<int64_t, 4> dimensions;
   if (parseDimensionListRanked(dimensions, /*allowDynamic=*/false))
@@ -467,7 +473,7 @@ VectorType Parser::parseVectorType() {
     return emitError(typeLoc, "vector elements must be int or float type"),
            nullptr;
 
-  return VectorType::get(dimensions, elementType);
+  return VectorType::get(dimensions, elementType, scalable);
 }
 
 /// Parse a dimension list of a tensor or memref type.  This populates the
@@ -532,6 +538,16 @@ ParseResult Parser::parseXInDimensionList() {
 
   // Consume the 'x'.
   consumeToken(Token::bare_identifier);
+
+  return success();
+}
+
+/// Parse a 'vscale' and 'x' tokens in a dimension list
+ParseResult Parser::parseScaleIdentifierInDimensionList() {
+  if (consumeIf(Token::kw_vscale)) {
+    if (parseXInDimensionList())
+      return emitError("expected 'x' after 'vscale'");
+  }
 
   return success();
 }

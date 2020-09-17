@@ -222,7 +222,8 @@ static LogicalResult getIndexedPtrs(ConversionPatternRewriter &rewriter,
   if (failed(getBase(rewriter, loc, memref, memRefType, base)))
     return failure();
   auto pType = MemRefDescriptor(memref).getElementPtrType();
-  auto ptrsType = LLVM::LLVMType::getVectorTy(pType, vType.getDimSize(0));
+  auto ptrsType = LLVM::LLVMType::getVectorTy(pType, vType.getDimSize(0),
+                                              vType.isScalable());
   ptrs = rewriter.create<LLVM::GEPOp>(loc, ptrsType, base, indices);
   return success();
 }

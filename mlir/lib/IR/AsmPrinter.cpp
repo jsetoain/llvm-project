@@ -1805,6 +1805,8 @@ void ModulePrinter::printType(Type type) {
       })
       .Case<VectorType>([&](VectorType vectorTy) {
         os << "vector<";
+        if (vectorTy.isScalable())
+          os << "vscale x";
         for (int64_t dim : vectorTy.getShape())
           os << dim << 'x';
         os << vectorTy.getElementType() << '>';

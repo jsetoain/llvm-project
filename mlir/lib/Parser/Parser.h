@@ -167,6 +167,7 @@ public:
   ParseResult parseDimensionListRanked(SmallVectorImpl<int64_t> &dimensions,
                                        bool allowDynamic = true);
   ParseResult parseXInDimensionList();
+  ParseResult parseScaleIdentifierInDimensionList();
 
   /// Parse strided layout specification.
   ParseResult parseStridedLayout(int64_t &offset,

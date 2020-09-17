@@ -135,33 +135,41 @@ struct ShapedTypeStorage : public TypeStorage {
 /// Vector Type Storage and Uniquing.
 struct VectorTypeStorage : public ShapedTypeStorage {
   VectorTypeStorage(unsigned shapeSize, Type elementTy,
-                    const int64_t *shapeElements)
+                    const int64_t *shapeElements,
+                    bool scalable = false)
       : ShapedTypeStorage(elementTy), shapeElements(shapeElements),
-        shapeSize(shapeSize) {}
+        shapeSize(shapeSize), scalable(scalable) {}
 
   /// The hash key used for uniquing.
-  using KeyTy = std::pair<ArrayRef<int64_t>, Type>;
+  using KeyTy = std::tuple<ArrayRef<int64_t>, Type, uint8_t>;
   bool operator==(const KeyTy &key) const {
-    return key == KeyTy(getShape(), elementType);
+    return key == KeyTy(getShape(), elementType,
+                        static_cast<uint8_t>(scalable));
   }
 
   /// Construction.
   static VectorTypeStorage *construct(TypeStorageAllocator &allocator,
                                       const KeyTy &key) {
     // Copy the shape into the bump pointer.
-    ArrayRef<int64_t> shape = allocator.copyInto(key.first);
+    ArrayRef<int64_t> shape = allocator.copyInto(std::get<0>(key));
 
     // Initialize the memory using placement new.
     return new (allocator.allocate<VectorTypeStorage>())
-        VectorTypeStorage(shape.size(), key.second, shape.data());
+        VectorTypeStorage(shape.size(), std::get<1>(key), shape.data(),
+                          std::get<2>(key));
   }
 
   ArrayRef<int64_t> getShape() const {
     return ArrayRef<int64_t>(shapeElements, shapeSize);
   }
 
+  bool isScalable() const {
+    return scalable;
+  }
+
   const int64_t *shapeElements;
   unsigned shapeSize;
+  bool scalable;
 };
 
 struct RankedTensorTypeStorage : public ShapedTypeStorage {

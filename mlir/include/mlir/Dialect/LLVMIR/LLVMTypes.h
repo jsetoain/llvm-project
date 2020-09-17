@@ -180,7 +180,8 @@ public:
     SmallVector<LLVMType, 8> fields({elt1, elts...});
     return getStructTy(elt1.getContext(), fields);
   }
-  static LLVMType getVectorTy(LLVMType elementType, unsigned numElements);
+  static LLVMType getVectorTy(LLVMType elementType, unsigned numElements,
+                              bool scalable = false);
 
   /// Void type utilities.
   static LLVMType getVoidTy(MLIRContext *context);

@@ -408,7 +408,8 @@ Type LLVMTypeConverter::convertVectorType(VectorType type) {
   if (!elementType)
     return {};
   auto vectorType =
-      LLVM::LLVMType::getVectorTy(elementType, type.getShape().back());
+      LLVM::LLVMType::getVectorTy(elementType, type.getShape().back(),
+                                  type.isScalable());
   auto shape = type.getShape();
   for (int i = shape.size() - 2; i >= 0; --i)
     vectorType = LLVM::LLVMType::getArrayTy(vectorType, shape[i]);
@@ -1695,6 +1696,7 @@ using UnsignedRemIOpLowering =
     VectorConvertToLLVMPattern<UnsignedRemIOp, LLVM::URemOp>;
 using UnsignedShiftRightOpLowering =
     OneToOneConvertToLLVMPattern<UnsignedShiftRightOp, LLVM::LShrOp>;
+using VScaleOpLowering = OneToOneConvertToLLVMPattern<VScaleOp, LLVM::VScaleOp>;
 using XOrOpLowering = VectorConvertToLLVMPattern<XOrOp, LLVM::XOrOp>;
 
 /// Lower `std.assert`. The default lowering calls the `abort` function if the
@@ -3989,6 +3991,7 @@ void mlir::populateStdToLLVMNonMemoryConversionPatterns(
       UnsignedDivIOpLowering,
       UnsignedRemIOpLowering,
       UnsignedShiftRightOpLowering,
+      VScaleOpLowering,
       XOrOpLowering,
       ZeroExtendIOpLowering>(converter);
   // clang-format on

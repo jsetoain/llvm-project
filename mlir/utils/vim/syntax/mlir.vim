@@ -69,6 +69,7 @@ syn keyword mlirKeyword
       \ return
       \ step
       \ to
+      \ vscale
 
 " Misc syntax.
 

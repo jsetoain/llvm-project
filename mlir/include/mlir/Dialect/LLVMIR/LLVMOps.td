@@ -1164,4 +1164,13 @@ def LLVM_FenceOp : LLVM_ZeroResultOp<"fence", []> {
   let printer = [{ printFenceOp(p, *this); }];
   let verifier = "return ::verify(*this);";
 }
+
+def LLVM_VScaleOp : LLVM_OneResultIntrOp<"vscale",
+                                         [], [0], [NoSideEffect]> {
+  let results = (outs LLVM_AnyInteger:$res);
+  let assemblyFormat = [{
+    attr-dict `:` type($res)
+  }];
+}
+
 #endif // LLVMIR_OPS
