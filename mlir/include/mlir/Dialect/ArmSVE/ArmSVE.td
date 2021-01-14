@@ -129,6 +129,45 @@ class ScalableVectorOfLengthAndType<list<int> allowedLengths,
 class ArmSVE_Op<string mnemonic, list<OpTrait> traits = []> :
   Op<ArmSVE_Dialect, mnemonic, traits> {}
 
+def ScalableLoadOp : ArmSVE_Op<"load">,
+    Arguments<(ins Arg<AnyMemRef, "", [MemRead]>:$base, Index:$index)>,
+    Results<(outs ScalableVectorOf<[AnyType]>:$result)> {
+  let summary = "Load scalable vector from memory";
+  let description = [{
+    Load a slice of memory into a scalable vector.
+  }];
+  let extraClassDeclaration = [{
+    MemRefType getMemRefType() {
+      return base().getType().cast<MemRefType>();
+    }
+    ScalableVectorType getResultScalableVectorType() {
+      return result().getType().cast<ScalableVectorType>();
+    }
+  }];
+  let assemblyFormat = "$base `[` $index `]` attr-dict `:` "
+    "type($base) `into` type($result)";
+}
+
+def ScalableStoreOp : ArmSVE_Op<"store">,
+    Arguments<(ins Arg<AnyMemRef, "", [MemWrite]>:$base,
+                   Index:$index,
+                   ScalableVectorOf<[AnyType]>:$value)> {
+  let summary = "Store scalable vector into memory";
+  let description = [{
+    Store a scalable vector on a slice of memory.
+  }];
+  let extraClassDeclaration = [{
+    MemRefType getMemRefType() {
+      return base().getType().cast<MemRefType>();
+    }
+    ScalableVectorType getValueScalableVectorType() {
+      return value().getType().cast<ScalableVectorType>();
+    }
+  }];
+  let assemblyFormat = "$base `[` $index `]` `,` $value attr-dict `:` "
+    "type($base) `,` type($value)";
+}
+
 def SdotOp : ArmSVE_Op<"sdot",
                [NoSideEffect,
                AllTypesMatch<["src1", "src2"]>,
@@ -271,6 +310,102 @@ def VectorScaleOp : ArmSVE_Op<"vector_scale",
   let results = (outs Index:$res);
   let assemblyFormat =
     "attr-dict `:` type($res)";
+}
+
+def ScalableAddIOp : ArmSVE_Op<"addi",
+                       [Commutative,
+                       AllTypesMatch<["src1", "src2", "dst"]>
+                     ]> {
+  let summary = "addition for scalable vectors of integers";
+  let description = [{
+    Syntax:
+
+    ```
+    operation ::= ssa-id `=` `arm_sve.addi` ssa-use `,` ssa-use `:` !arm_sve.vector
+    ```
+
+    The `arm_sve.addi` operations takes two scalable vectors and returns one
+    scalable vector with the result of the operation.
+  }];
+  let arguments = (ins
+          ScalableVectorOf<[I8, I16, I32, I64]>:$src1,
+          ScalableVectorOf<[I8, I16, I32, I64]>:$src2
+  );
+  let results = (outs ScalableVectorOf<[I8, I16, I32, I64]>:$dst);
+  let assemblyFormat =
+    "$src1 `,` $src2 attr-dict `:` type($src1)";
+}
+
+def ScalableAddFOp : ArmSVE_Op<"addf",
+                       [Commutative,
+                       AllTypesMatch<["src1", "src2", "dst"]>
+                     ]> {
+  let summary = "addition for scalable vectors of floats";
+  let description = [{
+    Syntax:
+
+    ```
+    operation ::= ssa-id `=` `arm_sve.addf` ssa-use `,` ssa-use `:` !arm_sve.vector
+    ```
+
+    The `arm_sve.addf` operations takes two scalable vectors and returns one
+    scalable vector with the result of the operation.
+  }];
+  let arguments = (ins
+          ScalableVectorOf<[AnyFloat]>:$src1,
+          ScalableVectorOf<[AnyFloat]>:$src2
+  );
+  let results = (outs ScalableVectorOf<[AnyFloat]>:$dst);
+  let assemblyFormat =
+    "$src1 `,` $src2 attr-dict `:` type($src1)";
+}
+
+def ScalableMulIOp : ArmSVE_Op<"muli",
+                       [Commutative,
+                       AllTypesMatch<["src1", "src2", "dst"]>
+                     ]> {
+  let summary = "multiplication for scalable vectors of integers";
+  let description = [{
+    Syntax:
+
+    ```
+    operation ::= ssa-id `=` `arm_sve.muli` ssa-use `,` ssa-use `:` !arm_sve.vector
+    ```
+
+    The `arm_sve.muli` operations takes two scalable vectors and returns one
+    scalable vector with the result of the operation.
+  }];
+  let arguments = (ins
+          ScalableVectorOf<[I8, I16, I32, I64]>:$src1,
+          ScalableVectorOf<[I8, I16, I32, I64]>:$src2
+  );
+  let results = (outs ScalableVectorOf<[I8, I16, I32, I64]>:$dst);
+  let assemblyFormat =
+    "$src1 `,` $src2 attr-dict `:` type($src1)";
+}
+
+def ScalableMulFOp : ArmSVE_Op<"mulf",
+                       [Commutative,
+                       AllTypesMatch<["src1", "src2", "dst"]>
+                     ]> {
+  let summary = "multiplication for scalable vectors of floats";
+  let description = [{
+    Syntax:
+
+    ```
+    operation ::= ssa-id `=` `arm_sve.mulf` ssa-use `,` ssa-use `:` !arm_sve.vector
+    ```
+
+    The `arm_sve.mulf` operations takes two scalable vectors and returns one
+    scalable vector with the result of the operation.
+  }];
+  let arguments = (ins
+          ScalableVectorOf<[AnyFloat]>:$src1,
+          ScalableVectorOf<[AnyFloat]>:$src2
+  );
+  let results = (outs ScalableVectorOf<[AnyFloat]>:$dst);
+  let assemblyFormat =
+    "$src1 `,` $src2 attr-dict `:` type($src1)";
 }
 
 #endif // ARMSVE_OPS

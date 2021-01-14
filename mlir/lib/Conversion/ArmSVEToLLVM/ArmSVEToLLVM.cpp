@@ -35,6 +35,18 @@ using UmmlaOpLowering =
 using VectorScaleOpLowering =
     OneToOneConvertToLLVMPattern<VectorScaleOp, LLVM::vector_scale>;
 
+using ScalableAddIOpLowering =
+    OneToOneConvertToLLVMPattern<ScalableAddIOp, LLVM::AddOp>;
+
+using ScalableAddFOpLowering =
+    OneToOneConvertToLLVMPattern<ScalableAddFOp, LLVM::FAddOp>;
+
+using ScalableMulIOpLowering =
+    OneToOneConvertToLLVMPattern<ScalableMulIOp, LLVM::MulOp>;
+
+using ScalableMulFOpLowering =
+    OneToOneConvertToLLVMPattern<ScalableMulFOp, LLVM::FMulOp>;
+
 // Extract an LLVM IR type from the LLVM IR dialect type.
 static Type unwrap(Type type) {
   if (!type)
@@ -57,6 +69,75 @@ convertScalableVectorTypeToLLVM(ScalableVectorType svType,
       LLVM::LLVMScalableVectorType::get(elementType, svType.getShape().back());
   return sVectorType;
 }
+
+// Common base for load and store operations on MemRefs.  Restricts the match
+// to supported MemRef types.  Provides functionality to emit code accessing a
+// specific element of the underlying data buffer.
+template <typename Derived>
+struct ScalableLoadStoreOpLowering : public ConvertOpToLLVMPattern<Derived> {
+  using ConvertOpToLLVMPattern<Derived>::ConvertOpToLLVMPattern;
+  using ConvertOpToLLVMPattern<Derived>::isConvertibleAndHasIdentityMaps;
+  using Base = ScalableLoadStoreOpLowering<Derived>;
+
+  LogicalResult match(Derived op) const override {
+    MemRefType type = op.getMemRefType();
+    return isConvertibleAndHasIdentityMaps(type) ? success() : failure();
+  }
+};
+
+// Load operation is lowered to obtaining a pointer to the indexed element
+// and loading it.
+struct ScalableLoadOpLowering : public ScalableLoadStoreOpLowering<ScalableLoadOp> {
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(ScalableLoadOp loadOp, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    ScalableLoadOp::Adaptor transformed(operands);
+    auto type = loadOp.getMemRefType();
+
+    LLVMTypeConverter converter(loadOp.getContext());
+    auto llvmDataTypePtr = LLVM::LLVMPointerType::get(
+      convertScalableVectorTypeToLLVM(
+        loadOp.getResultScalableVectorType(), converter).getValue()
+    );
+    Value dataPtr =
+        getStridedElementPtr(loadOp.getLoc(), type, transformed.base(),
+                             transformed.index(), rewriter);
+    Value bitCastedPtr = rewriter.create<LLVM::BitcastOp>(loadOp.getLoc(),
+                      llvmDataTypePtr, dataPtr);
+    rewriter.replaceOpWithNewOp<LLVM::LoadOp>(loadOp, bitCastedPtr);
+    return success();
+  }
+};
+
+// Store operation is lowered to obtaining a pointer to the indexed element,
+// and storing the given value to it.
+struct ScalableStoreOpLowering : public ScalableLoadStoreOpLowering<ScalableStoreOp> {
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(ScalableStoreOp storeOp, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto type = storeOp.getMemRefType();
+    ScalableStoreOp::Adaptor transformed(operands);
+
+    LLVMTypeConverter converter(storeOp.getContext());
+    auto llvmDataTypePtr = LLVM::LLVMPointerType::get(
+      convertScalableVectorTypeToLLVM(
+        storeOp.getValueScalableVectorType(), converter).getValue()
+    );
+
+    Value dataPtr =
+        getStridedElementPtr(storeOp.getLoc(), type, transformed.base(),
+                             transformed.index(), rewriter);
+    Value bitCastedPtr = rewriter.create<LLVM::BitcastOp>(storeOp.getLoc(),
+                      llvmDataTypePtr, dataPtr);
+    rewriter.replaceOpWithNewOp<LLVM::StoreOp>(storeOp, transformed.value(),
+                                               bitCastedPtr);
+    return success();
+  }
+};
 
 template <typename OpTy>
 class ForwardOperands : public OpConversionPattern<OpTy> {
@@ -112,6 +193,12 @@ void mlir::populateArmSVEToLLVMConversionPatterns(
                   SmmlaOpLowering,
                   UdotOpLowering,
                   UmmlaOpLowering,
-                  VectorScaleOpLowering>(converter);
+                  VectorScaleOpLowering,
+                  ScalableAddIOpLowering,
+                  ScalableAddFOpLowering,
+                  ScalableMulIOpLowering,
+                  ScalableMulFOpLowering,
+                  ScalableLoadOpLowering,
+                  ScalableStoreOpLowering>(converter);
   // clang-format on
 }

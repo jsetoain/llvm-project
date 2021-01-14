@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "mlir/Dialect/ArmSVE/ArmSVEDialect.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -30,6 +31,22 @@
 
 using namespace mlir;
 using namespace mlir::vector;
+
+/// Added for Scalable Vector Support
+using namespace mlir::arm_sve;
+
+static AffineMap getScalableTransferMinorIdentityMap(
+                                              ShapedType shapedType,
+                                              ScalableVectorType sVectorType) {
+  int64_t elementVectorRank = 0;
+  ScalableVectorType elementVectorType =
+      shapedType.getElementType().dyn_cast<ScalableVectorType>();
+  if (elementVectorType)
+    elementVectorRank += 1; // elementVectorType.getRank(); // Scalable Vectors rank 1 only
+  return AffineMap::getMinorIdentityMap(
+      shapedType.getRank(), 1 - elementVectorRank, //sVectorType.getRank() - elementVectorRank,
+      shapedType.getContext());
+}
 
 /// Helper enum to classify mask value.
 enum class MaskFormat {
@@ -2097,20 +2114,33 @@ static ParseResult parseTransferReadOp(OpAsmParser &parser,
   if (!shapedType || !shapedType.isa<MemRefType, RankedTensorType>())
     return parser.emitError(typesLoc, "requires memref or ranked tensor type");
   VectorType vectorType = types[1].dyn_cast<VectorType>();
-  if (!vectorType)
-    return parser.emitError(typesLoc, "requires vector type");
+  ScalableVectorType sVectorType = types[1].dyn_cast<ScalableVectorType>();
+  if (!(vectorType || sVectorType))
+    return parser.emitError(typesLoc, "requires vector or scalable vector type");
   auto permutationAttrName = TransferReadOp::getPermutationMapAttrName();
   auto attr = result.attributes.get(permutationAttrName);
   if (!attr) {
-    auto permMap = getTransferMinorIdentityMap(shapedType, vectorType);
+    AffineMap permMap;
+    if (vectorType)
+      permMap = getTransferMinorIdentityMap(shapedType, vectorType);
+    else
+      permMap = getScalableTransferMinorIdentityMap(shapedType, sVectorType);
     result.attributes.set(permutationAttrName, AffineMapAttr::get(permMap));
   }
-  return failure(
+  if (vectorType)
+    return failure(
       parser.resolveOperand(sourceInfo, shapedType, result.operands) ||
       parser.resolveOperands(indexInfo, indexType, result.operands) ||
       parser.resolveOperand(paddingInfo, shapedType.getElementType(),
                             result.operands) ||
       parser.addTypeToList(vectorType, result.types));
+  else
+    return failure(
+      parser.resolveOperand(sourceInfo, shapedType, result.operands) ||
+      parser.resolveOperands(indexInfo, indexType, result.operands) ||
+      parser.resolveOperand(paddingInfo, shapedType.getElementType(),
+                            result.operands) ||
+      parser.addTypeToList(sVectorType, result.types));
 }
 
 static LogicalResult verify(TransferReadOp op) {

@@ -54,3 +54,39 @@ llvm.func @get_vector_scale() -> i64 {
   %0 = "llvm_arm_sve.vscale"() : () -> i64
   llvm.return %0 : i64
 }
+
+// CHECK-LABEL: define <vscale x 8 x i16> @arm_sve_addi
+llvm.func @arm_sve_addi(%arg0: !llvm.vec<? x 8 x i16>,
+                        %arg1: !llvm.vec<? x 8 x i16>)
+                        -> !llvm.vec<? x 8 x i16> {
+  // CHECK: add <vscale x 8 x i16>
+  %0 = llvm.add %arg0, %arg1  : !llvm.vec<? x 8 x i16>
+  llvm.return %0 : !llvm.vec<? x 8 x i16>
+}
+
+// CHECK-LABEL: define <vscale x 4 x float> @arm_sve_addf
+llvm.func @arm_sve_addf(%arg0: !llvm.vec<? x 4 x f32>,
+                        %arg1: !llvm.vec<? x 4 x f32>)
+                        -> !llvm.vec<? x 4 x f32> {
+  // CHECK: fadd <vscale x 4 x float>
+  %0 = llvm.fadd %arg0, %arg1  : !llvm.vec<? x 4 x f32>
+  llvm.return %0 : !llvm.vec<? x 4 x f32>
+}
+
+// CHECK-LABEL: define <vscale x 8 x i16> @arm_sve_muli
+llvm.func @arm_sve_muli(%arg0: !llvm.vec<? x 8 x i16>,
+                        %arg1: !llvm.vec<? x 8 x i16>)
+                        -> !llvm.vec<? x 8 x i16> {
+  // CHECK: mul <vscale x 8 x i16>
+  %0 = llvm.mul %arg0, %arg1  : !llvm.vec<? x 8 x i16>
+  llvm.return %0 : !llvm.vec<? x 8 x i16>
+}
+
+// CHECK-LABEL: define <vscale x 4 x float> @arm_sve_mulf
+llvm.func @arm_sve_mulf(%arg0: !llvm.vec<? x 4 x f32>,
+                        %arg1: !llvm.vec<? x 4 x f32>)
+                        -> !llvm.vec<? x 4 x f32> {
+  // CHECK: fmul <vscale x 4 x float>
+  %0 = llvm.fmul %arg0, %arg1  : !llvm.vec<? x 4 x f32>
+  llvm.return %0 : !llvm.vec<? x 4 x f32>
+}
