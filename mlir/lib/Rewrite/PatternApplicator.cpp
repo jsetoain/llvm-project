@@ -65,7 +65,7 @@ void PatternApplicator::applyCostModel(CostModel model) {
       if (pattern->getBenefit().isImpossibleToMatch())
         LLVM_DEBUG(logImpossibleToMatch(*pattern));
       else
-        patterns[it.first].push_back(pattern);
+        patterns[it.first].push_back(pattern); // DEBUG: Goes through here
     }
   }
   anyOpPatterns.clear();
@@ -75,7 +75,7 @@ void PatternApplicator::applyCostModel(CostModel model) {
       LLVM_DEBUG(logImpossibleToMatch(pattern));
     else
       anyOpPatterns.push_back(&pattern);
-  }
+  } // DEBUG: Skips this one
 
   // Sort the patterns using the provided cost model.
   llvm::SmallDenseMap<const Pattern *, PatternBenefit> benefits;
@@ -85,7 +85,7 @@ void PatternApplicator::applyCostModel(CostModel model) {
   auto processPatternList = [&](SmallVectorImpl<const RewritePattern *> &list) {
     // Special case for one pattern in the list, which is the most common case.
     if (list.size() == 1) {
-      if (model(*list.front()).isImpossibleToMatch()) {
+      if (model(*list.front()).isImpossibleToMatch()) { // DEBUG: FAILS HERE!!!
         LLVM_DEBUG(logImpossibleToMatch(*list.front()));
         list.clear();
       }

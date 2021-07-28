@@ -184,6 +184,47 @@ struct ScalableStoreOpLowering
   }
 };
 
+// The scalable broadcast operation is lowered to an insertelement + a
+// shufflevector operation. Scalable broadcast to only 1-d vector result
+// types are lowered.
+struct ScalableBroadcastOpLowering : public ConvertOpToLLVMPattern<ScalableBroadcastOp> {
+  using ConvertOpToLLVMPattern<ScalableBroadcastOp>::ConvertOpToLLVMPattern;
+
+  LogicalResult
+  matchAndRewrite(ScalableBroadcastOp sbcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // This should be checked in Op construction, with a predicate
+    Type vectorElementType = sbcOp.getVectorElementType();
+    Type sourceType = sbcOp.getSourceType();
+    if (vectorElementType != sourceType)
+      return failure();
+
+    // First insert it into an undef vector so we can shuffle it.
+    auto sVectorType = typeConverter->convertType(sbcOp.getType()).cast<ScalableVectorType>();
+    Value undef = rewriter.create<LLVM::UndefOp>(sbcOp.getLoc(), sVectorType);
+    auto zero = rewriter.create<LLVM::ConstantOp>(
+        sbcOp.getLoc(),
+        typeConverter->convertType(rewriter.getIntegerType(32)),
+        rewriter.getZeroAttr(rewriter.getIntegerType(32)));
+
+    auto v = rewriter.create<LLVM::InsertElementOp>(
+        sbcOp.getLoc(), sVectorType, undef, adaptor.source(), zero);
+
+//    int64_t width = sbcOp.getType().cast<ScalableVectorType>().getNumElements();
+//    SmallVector<int32_t, 4> zeroValues(width, 0);
+    auto zeroInitializer = rewriter.create<LLVM::ConstantOp>(
+        sbcOp.getLoc(), typeConverter->convertType(sVectorType.getElementType()),
+        rewriter.getZeroAttr(sVectorType.getElementType()),
+        typeConverter->convertType(sVectorType));
+
+    // Shuffle the value across the desired number of elements.
+    //ArrayAttr zeroAttrs = rewriter.getI32ArrayAttr(zeroValues);
+    rewriter.replaceOpWithNewOp<LLVM::ShuffleVectorOp>(sbcOp, v, undef,
+                                                       zeroInitializer);
+    return success();
+  }
+};
+
 static void
 populateBasicSVEArithmeticExportPatterns(LLVMTypeConverter &converter,
                                          OwningRewritePatternList &patterns) {
@@ -235,7 +276,7 @@ configureSVEMaskGenerationLegalizations(LLVMConversionTarget &target) {
 }
 
 /// Populate the given list with patterns that convert from ArmSVE to LLVM.
-void mlir::populateArmSVELegalizeForLLVMExportPatterns(
+void mlir::arm_sve::populateArmSVELegalizeForLLVMExportPatterns(
     LLVMTypeConverter &converter, OwningRewritePatternList &patterns) {
   // Populate conversion patterns
   // Remove any ArmSVE-specific types from function signatures and results.
@@ -255,6 +296,7 @@ void mlir::populateArmSVELegalizeForLLVMExportPatterns(
                UdotOpLowering,
                UmmlaOpLowering,
                VectorScaleOpLowering,
+               ScalableBroadcastOpLowering,
                ScalableMaskedAddIOpLowering,
                ScalableMaskedAddFOpLowering,
                ScalableMaskedSubIOpLowering,
@@ -271,7 +313,7 @@ void mlir::populateArmSVELegalizeForLLVMExportPatterns(
   populateSVEMaskGenerationExportPatterns(converter, patterns);
 }
 
-void mlir::configureArmSVELegalizeForExportTarget(
+void mlir::arm_sve::configureArmSVELegalizeForExportTarget(
     LLVMConversionTarget &target) {
   // clang-format off
   target.addLegalOp<SdotIntrOp,
@@ -293,6 +335,7 @@ void mlir::configureArmSVELegalizeForExportTarget(
                       UdotOp,
                       UmmlaOp,
                       VectorScaleOp,
+                      ScalableBroadcastOp,
                       ScalableMaskedAddIOp,
                       ScalableMaskedAddFOp,
                       ScalableMaskedSubIOp,

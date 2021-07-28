@@ -16,6 +16,8 @@ class LLVMTypeConverter;
 class RewritePatternSet;
 using OwningRewritePatternList = RewritePatternSet;
 
+namespace arm_sve {
+
 /// Collect a set of patterns to lower ArmSVE ops to ops that map to LLVM
 /// intrinsics.
 void populateArmSVELegalizeForLLVMExportPatterns(LLVMTypeConverter &converter,
@@ -25,6 +27,13 @@ void populateArmSVELegalizeForLLVMExportPatterns(LLVMTypeConverter &converter,
 /// intrinsics.
 void configureArmSVELegalizeForExportTarget(LLVMConversionTarget &target);
 
+extern const char *kPromoteLoopToVLALoop;
+/// Collect a set of patterns to convert tagged fixed-length vector loops into
+/// vector-length agnostic loops
+void populateArmSVEVLAConversionPatterns(TypeConverter &typeConverter,
+                                         RewritePatternSet &patterns);
+
+} // namespace arm_sve
 } // namespace mlir
 
 #endif // MLIR_DIALECT_ARMSVE_TRANSFORMS_H

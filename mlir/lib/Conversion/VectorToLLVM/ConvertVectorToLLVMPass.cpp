@@ -97,8 +97,8 @@ void LowerVectorToLLVMPass::runOnOperation() {
     target.addLegalDialect<arm_neon::ArmNeonDialect>();
   }
   if (enableArmSVE) {
-    configureArmSVELegalizeForExportTarget(target);
-    populateArmSVELegalizeForLLVMExportPatterns(converter, patterns);
+    arm_sve::configureArmSVELegalizeForExportTarget(target);
+    arm_sve::populateArmSVELegalizeForLLVMExportPatterns(converter, patterns);
   }
   if (enableAMX) {
     configureAMXLegalizeForExportTarget(target);

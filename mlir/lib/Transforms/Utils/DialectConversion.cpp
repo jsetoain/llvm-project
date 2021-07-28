@@ -49,7 +49,7 @@ computeConversionSet(iterator_range<Region::iterator> region,
       toConvert.emplace_back(&op);
 
       // Don't check this operation's children for conversion if the operation
-      // is recursively legal.
+      // is recursively legal. XXX: What does recursively legal mean?
       auto legalityInfo = target ? target->isLegal(&op)
                                  : Optional<ConversionTarget::LegalOpDetails>();
       if (legalityInfo && legalityInfo->isRecursivelyLegal)
@@ -2232,7 +2232,7 @@ void OperationLegalizer::computeLegalizationGraphBenefit(
       orderedPatternList = anyOpLegalizerPatterns;
 
     // If the pattern is not found, then it was removed and cannot be matched.
-    auto *it = llvm::find(orderedPatternList, &pattern);
+    auto *it = llvm::find(orderedPatternList, &pattern); // XXX: This is what's happening; pattern removed
     if (it == orderedPatternList.end())
       return PatternBenefit::impossibleToMatch();
 

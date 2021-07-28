@@ -388,6 +388,30 @@ def ScalableStoreOp : ArmSVE_Op<"store">,
     "type($value) `to` type($base)";
 }
 
+def ScalableBroadcastOp :
+  ArmSVE_Op<"broadcast", [NoSideEffect]>,
+    Arguments<(ins AnyType:$source)>,
+    Results<(outs ScalableVectorOf<[AnyType]>:$vector)> {
+  let summary = "scalable broadcast operation";
+  let description = [{
+    Broadcasts the scalar value in the source operand to a 1-D result scalable
+    vector by duplicating it in the result scalable vector. The source operand
+    must have the same element type as the result scalable vector.
+
+    ```mlir
+    %0 = constant 0.0 : f32
+    %1 = arm_sve.broadcast %0 : f32 to !arm_sve.vector<16xf32>
+    ```
+  }];
+  let extraClassDeclaration = [{
+    Type getSourceType() { return source().getType(); }
+    Type getVectorElementType() {
+      return vector().getType().cast<ScalableVectorType>().getElementType();
+    }
+  }];
+  let assemblyFormat = "$source attr-dict `:` type($source) `to` type($vector)";
+}
+
 def ScalableAddIOp : ScalableIOp<"addi", "addition", [Commutative]>;
 
 def ScalableAddFOp : ScalableFOp<"addf", "addition", [Commutative]>;
