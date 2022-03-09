@@ -11,6 +11,13 @@
 // RUN:  -e entry -entry-point-result=void  \
 // RUN:  -shared-libs=%mlir_integration_test_dir/libmlir_c_runner_utils%shlibext | \
 // RUN: FileCheck %s
+//
+// If SVE is available, test VLA vectorization.
+//
+// RUN: mlir-opt %s --sparse-compiler="vectorization-strategy=2 vl=4 enable-vla-vectorization=%ENABLE_VLA" | \
+// RUN: mlir-translate -mlir-to-llvmir | \
+// RUN: %lli --entry-function=entry %VLA_ARCH_ATTR_OPTIONS --dlopen=%mlir_native_utils_lib_dir/libmlir_c_runner_utils%shlibext | \
+// RUN: FileCheck %s
 
 #CSR = #sparse_tensor.encoding<{ dimLevelType = [ "dense", "compressed" ] }>
 
