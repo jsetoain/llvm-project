@@ -60,6 +60,12 @@ struct TestLinalgTransforms
   Option<bool> testPatterns{*this, "test-patterns",
                             llvm::cl::desc("Test a mixed set of patterns"),
                             llvm::cl::init(false)};
+  Option<bool> testMatmulToMMLAVectorContractions{
+      *this, "test-matmul-to-mmla-vector-contractions",
+      llvm::cl::desc(
+          "Test a fused pass that applies patterns from matmul to"
+          "MMLA-compatible vector contractions"),
+      llvm::cl::init(false)};
   Option<bool> testMatmulToVectorPatterns1dTiling{
       *this, "test-matmul-to-vector-patterns-tile-1d",
       llvm::cl::desc(
@@ -316,6 +322,35 @@ static void fillL1TilingAndMatmulToVectorPatterns(
   patternsVector.back().add<CopyVectorizationPattern>(ctx);
 }
 
+static void fillMMLAL1TilingAndMatmulToVectorPatterns(
+    FuncOp funcOp, StringRef startMarker,
+    SmallVectorImpl<RewritePatternSet> &patternsVector) {
+  MLIRContext *ctx = funcOp.getContext();
+  patternsVector.emplace_back(
+      ctx, std::make_unique<LinalgTilingPattern>(
+               MatmulOp::getOperationName(), ctx,
+               LinalgTilingOptions()
+                   .setTileSizes({2, 2, 8})
+                   .setInterchange({1, 0, 2}),
+               LinalgTransformationFilter(StringAttr::get(ctx, startMarker),
+                                          StringAttr::get(ctx, "L1"))));
+
+  patternsVector.emplace_back(
+      ctx,
+      std::make_unique<LinalgPromotionPattern<MatmulOp>>(
+          ctx, LinalgPromotionOptions().setUseFullTileBuffersByDefault(true),
+          LinalgTransformationFilter(StringAttr::get(ctx, "L1"),
+                                     StringAttr::get(ctx, "VEC"))));
+
+  patternsVector.emplace_back(
+      ctx, std::make_unique<LinalgVectorizationPattern>(
+               MatmulOp::getOperationName(), ctx, LinalgVectorizationOptions(),
+               LinalgTransformationFilter(StringAttr::get(ctx, "VEC"))));
+  patternsVector.back().add<LinalgVectorizationPattern>(
+      ctx, LinalgTransformationFilter().addOpFilter<FillOp>());
+  patternsVector.back().add<CopyVectorizationPattern>(ctx);
+}
+
 //===----------------------------------------------------------------------===//
 // Test promotion callbacks
 //===----------------------------------------------------------------------===//
@@ -533,11 +568,14 @@ static void fillTileFuseAndDistributePatterns(MLIRContext *context,
 static void
 applyMatmulToVectorPatterns(func::FuncOp funcOp,
                             bool testMatmulToVectorPatterns1dTiling,
-                            bool testMatmulToVectorPatterns2dTiling) {
+                            bool testMatmulToVectorPatterns2dTiling,
+                            bool testMatmulToMMLAVectorContractions) {
   MLIRContext *ctx = funcOp.getContext();
   SmallVector<RewritePatternSet, 4> stage1Patterns;
   if (testMatmulToVectorPatterns1dTiling) {
     fillL1TilingAndMatmulToVectorPatterns(funcOp, "START", stage1Patterns);
+  } else if (testMatmulToMMLAVectorContractions) {
+    fillMMLAL1TilingAndMatmulToVectorPatterns(funcOp, "START", stage1Patterns);
   } else if (testMatmulToVectorPatterns2dTiling) {
     stage1Patterns.emplace_back(
         ctx, std::make_unique<LinalgTilingPattern>(
@@ -677,10 +715,12 @@ void TestLinalgTransforms::runOnOperation() {
   }
   if (testPatterns)
     return applyPatterns(getOperation());
-  if (testMatmulToVectorPatterns1dTiling || testMatmulToVectorPatterns2dTiling)
+  if (testMatmulToVectorPatterns1dTiling || testMatmulToVectorPatterns2dTiling
+      || testMatmulToMMLAVectorContractions)
     return applyMatmulToVectorPatterns(getOperation(),
                                        testMatmulToVectorPatterns1dTiling,
-                                       testMatmulToVectorPatterns2dTiling);
+                                       testMatmulToVectorPatterns2dTiling,
+                                       testMatmulToMMLAVectorContractions);
   if (testVectorTransferForwardingPatterns)
     return applyVectorTransferForwardingPatterns(getOperation());
   if (testGenericToVectorPattern)
