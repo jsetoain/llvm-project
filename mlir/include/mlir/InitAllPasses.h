@@ -17,6 +17,7 @@
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
+#include "mlir/Dialect/ArmSVE/Passes.h"
 #include "mlir/Dialect/Async/Passes.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
@@ -56,6 +57,7 @@ inline void registerAllPasses() {
 
   // Dialect passes
   registerAffinePasses();
+  registerArmSVEPasses();
   registerAsyncPasses();
   arith::registerArithmeticPasses();
   bufferization::registerBufferizationPasses();
