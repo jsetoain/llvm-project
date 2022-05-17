@@ -22,19 +22,6 @@ using namespace mlir;
 using namespace mlir::arm_sve;
 
 //===----------------------------------------------------------------------===//
-// ScalableVector versions of general helpers for comparison ops
-//===----------------------------------------------------------------------===//
-
-/// Return the scalable vector of the same shape and containing i1.
-static Type getI1SameShape(Type type) {
-  auto i1Type = IntegerType::get(type.getContext(), 1);
-  if (auto sVectorType = type.dyn_cast<VectorType>())
-    return VectorType::get(sVectorType.getShape(), i1Type,
-                           sVectorType.getNumScalableDims());
-  return nullptr;
-}
-
-//===----------------------------------------------------------------------===//
 // Tablegen Definitions
 //===----------------------------------------------------------------------===//
 

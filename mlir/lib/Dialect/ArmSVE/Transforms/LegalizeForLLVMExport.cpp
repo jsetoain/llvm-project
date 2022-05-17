@@ -38,33 +38,6 @@ using SdotOpLowering = OneToOneConvertToLLVMPattern<SdotOp, SdotIntrOp>;
 using SmmlaOpLowering = OneToOneConvertToLLVMPattern<SmmlaOp, SmmlaIntrOp>;
 using UdotOpLowering = OneToOneConvertToLLVMPattern<UdotOp, UdotIntrOp>;
 using UmmlaOpLowering = OneToOneConvertToLLVMPattern<UmmlaOp, UmmlaIntrOp>;
-using ScalableMaskedAddIOpLowering =
-    OneToOneConvertToLLVMPattern<ScalableMaskedAddIOp,
-                                 ScalableMaskedAddIIntrOp>;
-using ScalableMaskedAddFOpLowering =
-    OneToOneConvertToLLVMPattern<ScalableMaskedAddFOp,
-                                 ScalableMaskedAddFIntrOp>;
-using ScalableMaskedSubIOpLowering =
-    OneToOneConvertToLLVMPattern<ScalableMaskedSubIOp,
-                                 ScalableMaskedSubIIntrOp>;
-using ScalableMaskedSubFOpLowering =
-    OneToOneConvertToLLVMPattern<ScalableMaskedSubFOp,
-                                 ScalableMaskedSubFIntrOp>;
-using ScalableMaskedMulIOpLowering =
-    OneToOneConvertToLLVMPattern<ScalableMaskedMulIOp,
-                                 ScalableMaskedMulIIntrOp>;
-using ScalableMaskedMulFOpLowering =
-    OneToOneConvertToLLVMPattern<ScalableMaskedMulFOp,
-                                 ScalableMaskedMulFIntrOp>;
-using ScalableMaskedSDivIOpLowering =
-    OneToOneConvertToLLVMPattern<ScalableMaskedSDivIOp,
-                                 ScalableMaskedSDivIIntrOp>;
-using ScalableMaskedUDivIOpLowering =
-    OneToOneConvertToLLVMPattern<ScalableMaskedUDivIOp,
-                                 ScalableMaskedUDivIIntrOp>;
-using ScalableMaskedDivFOpLowering =
-    OneToOneConvertToLLVMPattern<ScalableMaskedDivFOp,
-                                 ScalableMaskedDivFIntrOp>;
 
 /// Populate the given list with patterns that convert from ArmSVE to LLVM.
 void mlir::populateArmSVELegalizeForLLVMExportPatterns(
@@ -79,16 +52,7 @@ void mlir::populateArmSVELegalizeForLLVMExportPatterns(
   patterns.add<SdotOpLowering,
                SmmlaOpLowering,
                UdotOpLowering,
-               UmmlaOpLowering,
-               ScalableMaskedAddIOpLowering,
-               ScalableMaskedAddFOpLowering,
-               ScalableMaskedSubIOpLowering,
-               ScalableMaskedSubFOpLowering,
-               ScalableMaskedMulIOpLowering,
-               ScalableMaskedMulFOpLowering,
-               ScalableMaskedSDivIOpLowering,
-               ScalableMaskedUDivIOpLowering,
-               ScalableMaskedDivFOpLowering>(converter);
+               UmmlaOpLowering>(converter);
   // clang-format on
 }
 
@@ -98,28 +62,10 @@ void mlir::configureArmSVELegalizeForExportTarget(
   target.addLegalOp<SdotIntrOp,
                     SmmlaIntrOp,
                     UdotIntrOp,
-                    UmmlaIntrOp,
-                    ScalableMaskedAddIIntrOp,
-                    ScalableMaskedAddFIntrOp,
-                    ScalableMaskedSubIIntrOp,
-                    ScalableMaskedSubFIntrOp,
-                    ScalableMaskedMulIIntrOp,
-                    ScalableMaskedMulFIntrOp,
-                    ScalableMaskedSDivIIntrOp,
-                    ScalableMaskedUDivIIntrOp,
-                    ScalableMaskedDivFIntrOp>();
+                    UmmlaIntrOp>();
   target.addIllegalOp<SdotOp,
                       SmmlaOp,
                       UdotOp,
-                      UmmlaOp,
-                      ScalableMaskedAddIOp,
-                      ScalableMaskedAddFOp,
-                      ScalableMaskedSubIOp,
-                      ScalableMaskedSubFOp,
-                      ScalableMaskedMulIOp,
-                      ScalableMaskedMulFOp,
-                      ScalableMaskedSDivIOp,
-                      ScalableMaskedUDivIOp,
-                      ScalableMaskedDivFOp>();
+                      UmmlaOp>();
   // clang-format on
 }

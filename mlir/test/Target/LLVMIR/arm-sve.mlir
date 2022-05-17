@@ -48,97 +48,6 @@ llvm.func @arm_sve_ummla(%arg0: vector<[16]xi8>,
   llvm.return %0 : vector<[4]xi32>
 }
 
-// CHECK-LABEL: define <vscale x 4 x i32> @arm_sve_arithi
-llvm.func @arm_sve_arithi(%arg0: vector<[4]xi32>,
-                          %arg1: vector<[4]xi32>,
-                          %arg2: vector<[4]xi32>)
-                          -> vector<[4]xi32> {
-  // CHECK: mul <vscale x 4 x i32>
-  %0 = llvm.mul %arg0, %arg1 : vector<[4]xi32>
-  // CHECK: add <vscale x 4 x i32>
-  %1 = llvm.add %0, %arg2 : vector<[4]xi32>
-  llvm.return %1 : vector<[4]xi32>
-}
-
-// CHECK-LABEL: define <vscale x 4 x float> @arm_sve_arithf
-llvm.func @arm_sve_arithf(%arg0: vector<[4]xf32>,
-                          %arg1: vector<[4]xf32>,
-                          %arg2: vector<[4]xf32>)
-                          -> vector<[4]xf32> {
-  // CHECK: fmul <vscale x 4 x float>
-  %0 = llvm.fmul %arg0, %arg1 : vector<[4]xf32>
-  // CHECK: fadd <vscale x 4 x float>
-  %1 = llvm.fadd %0, %arg2 : vector<[4]xf32>
-  llvm.return %1 : vector<[4]xf32>
-}
-
-// CHECK-LABEL: define <vscale x 4 x i32> @arm_sve_arithi_masked
-llvm.func @arm_sve_arithi_masked(%arg0: vector<[4]xi32>,
-                                 %arg1: vector<[4]xi32>,
-                                 %arg2: vector<[4]xi32>,
-                                 %arg3: vector<[4]xi32>,
-                                 %arg4: vector<[4]xi32>,
-                                 %arg5: vector<[4]xi1>)
-                                 -> vector<[4]xi32> {
-  // CHECK: call <vscale x 4 x i32> @llvm.aarch64.sve.add.nxv4i32
-  %0 = "arm_sve.intr.add"(%arg5, %arg0, %arg1) : (vector<[4]xi1>,
-                                                  vector<[4]xi32>,
-                                                  vector<[4]xi32>)
-                                                  -> vector<[4]xi32>
-  // CHECK: call <vscale x 4 x i32> @llvm.aarch64.sve.sub.nxv4i32
-  %1 = "arm_sve.intr.sub"(%arg5, %0, %arg1) : (vector<[4]xi1>,
-                                               vector<[4]xi32>,
-                                               vector<[4]xi32>)
-                                               -> vector<[4]xi32>
-  // CHECK: call <vscale x 4 x i32> @llvm.aarch64.sve.mul.nxv4i32
-  %2 = "arm_sve.intr.mul"(%arg5, %1, %arg3) : (vector<[4]xi1>,
-                                               vector<[4]xi32>,
-                                               vector<[4]xi32>)
-                                               -> vector<[4]xi32>
-  // CHECK: call <vscale x 4 x i32> @llvm.aarch64.sve.sdiv.nxv4i32
-  %3 = "arm_sve.intr.sdiv"(%arg5, %2, %arg4) : (vector<[4]xi1>,
-                                               vector<[4]xi32>,
-                                               vector<[4]xi32>)
-                                               -> vector<[4]xi32>
-  // CHECK: call <vscale x 4 x i32> @llvm.aarch64.sve.udiv.nxv4i32
-  %4 = "arm_sve.intr.udiv"(%arg5, %3, %arg4) : (vector<[4]xi1>,
-                                               vector<[4]xi32>,
-                                               vector<[4]xi32>)
-                                               -> vector<[4]xi32>
-  llvm.return %4 : vector<[4]xi32>
-}
-
-// CHECK-LABEL: define <vscale x 4 x float> @arm_sve_arithf_masked
-llvm.func @arm_sve_arithf_masked(%arg0: vector<[4]xf32>,
-                                 %arg1: vector<[4]xf32>,
-                                 %arg2: vector<[4]xf32>,
-                                 %arg3: vector<[4]xf32>,
-                                 %arg4: vector<[4]xf32>,
-                                 %arg5: vector<[4]xi1>)
-                                 -> vector<[4]xf32> {
-  // CHECK: call <vscale x 4 x float> @llvm.aarch64.sve.fadd.nxv4f32
-  %0 = "arm_sve.intr.fadd"(%arg5, %arg0, %arg1) : (vector<[4]xi1>,
-                                                   vector<[4]xf32>,
-                                                   vector<[4]xf32>)
-                                                   -> vector<[4]xf32>
-  // CHECK: call <vscale x 4 x float> @llvm.aarch64.sve.fsub.nxv4f32
-  %1 = "arm_sve.intr.fsub"(%arg5, %0, %arg2) : (vector<[4]xi1>,
-                                                vector<[4]xf32>,
-                                                vector<[4]xf32>)
-                                                -> vector<[4]xf32>
-  // CHECK: call <vscale x 4 x float> @llvm.aarch64.sve.fmul.nxv4f32
-  %2 = "arm_sve.intr.fmul"(%arg5, %1, %arg3) : (vector<[4]xi1>,
-                                                vector<[4]xf32>,
-                                                vector<[4]xf32>)
-                                                -> vector<[4]xf32>
-  // CHECK: call <vscale x 4 x float> @llvm.aarch64.sve.fdiv.nxv4f32
-  %3 = "arm_sve.intr.fdiv"(%arg5, %2, %arg4) : (vector<[4]xi1>,
-                                                vector<[4]xf32>,
-                                                vector<[4]xf32>)
-                                                -> vector<[4]xf32>
-  llvm.return %3 : vector<[4]xf32>
-}
-
 // CHECK-LABEL: define <vscale x 4 x i1> @arm_sve_mask_genf
 llvm.func @arm_sve_mask_genf(%arg0: vector<[4]xf32>,
                              %arg1: vector<[4]xf32>)
@@ -155,39 +64,6 @@ llvm.func @arm_sve_mask_geni(%arg0: vector<[4]xi32>,
   // CHECK: icmp uge <vscale x 4 x i32>
   %0 = llvm.icmp "uge" %arg0, %arg1 : vector<[4]xi32>
   llvm.return %0 : vector<[4]xi1>
-}
-
-// CHECK-LABEL: define <vscale x 4 x i32> @arm_sve_abs_diff
-llvm.func @arm_sve_abs_diff(%arg0: vector<[4]xi32>,
-                            %arg1: vector<[4]xi32>)
-                            -> vector<[4]xi32> {
-  // CHECK: sub <vscale x 4 x i32>
-  %0 = llvm.sub %arg0, %arg0  : vector<[4]xi32>
-  // CHECK: icmp sge <vscale x 4 x i32>
-  %1 = llvm.icmp "sge" %arg0, %arg1 : vector<[4]xi32>
-  // CHECK: icmp slt <vscale x 4 x i32>
-  %2 = llvm.icmp "slt" %arg0, %arg1 : vector<[4]xi32>
-  // CHECK: call <vscale x 4 x i32> @llvm.aarch64.sve.sub.nxv4i32
-  %3 = "arm_sve.intr.sub"(%1, %arg0, %arg1) : (vector<[4]xi1>,
-                                               vector<[4]xi32>,
-                                               vector<[4]xi32>)
-                                               -> vector<[4]xi32>
-  // CHECK: call <vscale x 4 x i32> @llvm.aarch64.sve.sub.nxv4i32
-  %4 = "arm_sve.intr.sub"(%2, %arg1, %arg0) : (vector<[4]xi1>,
-                                               vector<[4]xi32>,
-                                               vector<[4]xi32>)
-                                               -> vector<[4]xi32>
-  // CHECK: call <vscale x 4 x i32> @llvm.aarch64.sve.add.nxv4i32
-  %5 = "arm_sve.intr.add"(%1, %0, %3) : (vector<[4]xi1>,
-                                         vector<[4]xi32>,
-                                         vector<[4]xi32>)
-                                         -> vector<[4]xi32>
-  // CHECK: call <vscale x 4 x i32> @llvm.aarch64.sve.add.nxv4i32
-  %6 = "arm_sve.intr.add"(%2, %5, %4) : (vector<[4]xi1>,
-                                         vector<[4]xi32>,
-                                         vector<[4]xi32>)
-                                         -> vector<[4]xi32>
-  llvm.return %6 : vector<[4]xi32>
 }
 
 // CHECK-LABEL: define void @memcopy

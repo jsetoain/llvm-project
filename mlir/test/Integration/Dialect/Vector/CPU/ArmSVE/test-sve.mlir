@@ -53,10 +53,8 @@ func.func @kernel_absdiff(%a : memref<?xi64>,
     %1 = vector.load %b[%i0] : memref<?xi64>, vector<[2]xi64>
     %agb = arith.cmpi sge, %0, %1 : vector<[2]xi64>
     %bga = arith.cmpi slt, %0, %1 : vector<[2]xi64>
-    %10 = arm_sve.masked.subi %agb, %0, %1 : vector<[2]xi1>,
-                                             vector<[2]xi64>
-    %01 = arm_sve.masked.subi %bga, %1, %0 : vector<[2]xi1>,
-                                             vector<[2]xi64>
+    %10 = arith.subi %0, %1 : vector<[2]xi64>
+    %01 = arith.subi %1, %0 : vector<[2]xi64>
     vector.maskedstore %c[%i0], %agb, %10 : memref<?xi64>,
                                             vector<[2]xi1>,
                                             vector<[2]xi64>
