@@ -11,11 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Dialect/ArmSVE/ArmSVEDialect.h"
+#include "mlir-c/BuiltinTypes.h"
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
@@ -51,4 +53,30 @@ void ArmSVEDialect::initialize() {
 #define GET_OP_LIST
 #include "mlir/Dialect/ArmSVE/ArmSVE.cpp.inc"
       >();
+}
+
+LogicalResult DotOp::verify() {
+  VectorType src1Type = src1().getType().cast<VectorType>();
+  VectorType accType = acc().getType().cast<VectorType>();
+  Type src1ElemType = src1Type.getElementType();
+  Type accElemType = accType.getElementType();
+  if (src1ElemType.isa<BFloat16Type>()) {
+    if (!accElemType.isa<Float32Type>())
+      return emitOpError("{acc, dst} must be 32-bit floating point type");
+    if (src1Type.getNumElements() != 8 || accType.getNumElements() != 4)
+      return emitOpError("{acc, dst} must be vectors of size 4, {src1, src2} "
+                         "must be vectors of size 8");
+  } else { // if (src1ElemType.isa<IntegerType>())
+    if (!accElemType.isa<IntegerType>())
+      return emitOpError("{dst, acc, src1, src2} must be of integer type");
+    unsigned src1Width = src1ElemType.cast<IntegerType>().getWidth();
+    unsigned accWidth = accElemType.cast<IntegerType>().getWidth();
+    if (accWidth != src1Width * 4)
+      return emitOpError("bit width of {src1, src2} must be four times the bit "
+                         "width of the {dst, acc}");
+    if (accType.getNumElements() * 4 != src1Type.getNumElements())
+      return emitOpError("the dimensionality of {src1, src2} must be four times"
+                         " the dimensionality of {dst, acc}");
+  }
+  return success();
 }

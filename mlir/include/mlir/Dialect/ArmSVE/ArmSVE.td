@@ -156,20 +156,34 @@ def SmmlaOp : ArmSVE_Op<"smmla",
     "$acc `,` $src1 `,` $src2 attr-dict `:` type($src1) `to` type($dst)";
 }
 
-def UdotOp : ArmSVE_Op<"udot",
+def DotOp : ArmSVE_Op<"dot",
                [NoSideEffect,
                AllTypesMatch<["src1", "src2"]>,
                AllTypesMatch<["acc", "dst"]>,
              ]> {
   let summary = "Vector-vector dot product and accumulate op";
   let description = [{
-    UDOT: Unsigned integer addition of dot product.
+    DOT: Signed/unsigned integer, and bfloat16 floating-point dot product.
 
-    This function maps to the UDOT instruction, and it takes signless integer
-    operands that the operation interprets as unsigned. It partitions the second
-    and third vector inputs into groups of four elements. They calculate the dot
-    product of each group (without loss of precision) and then add each result
-    to the overlapping element of the first vector input.
+    This operation maps to the xDOT SVE instructions (sdot, udot, bfdot).
+    SVE xDOT instructions compute the dot product of a group of four 8-bit or
+    16-bit values held in each 32-bit or 64-bit element of the first source
+    vector `$src1`, multiplied by a group of four 8-bit or 16-bit values in the
+    corresponding 32-bit or 64-bit element of the second source vector `$src2`,
+    and then adds the widened dot product to the corresponding 32-bit or 64-bit
+    element of the accumulator vector `$acc`.
+
+    The sources operands can be either 8-bit or 16-bit integer vectors, or
+    bfloat16 floating-point vectors. For 8-bit integers, the number of elements
+    of the accumulator vector `$acc` is expected to be 1/4th that of the source
+    vectors `$src1` and `$src2`, and of type `i32` or `i64`, depending on
+    whether the source operands are `i8` or `i16` respectively. For bfloat16
+    floating-point source operands, the accumulator vector `$acc` is expetected
+    to be half the length of the operands and of type `f32`.
+
+    For integer operands, `arm_sve::dot` will translate to SVE `sdot` if the
+    integer types are signed or signless, or `udot` if they are unsigned. For
+    bfloat16 floating-point source types, it will map to `bfdot`.
 
     Source:
     https://developer.arm.com/documentation/100987/0000
@@ -177,14 +191,31 @@ def UdotOp : ArmSVE_Op<"udot",
   // Supports either:
   //   (vector<16xi8>, vector<16xi8>) -> (vector<4xi32>)
   //   (vector<8xi16>. vector<8xi16>) -> (vector<2xi64>)
+  //   (vector<16xu8>, vector<16xu8>) -> (vector<4xu32>)
+  //   (vector<8xu16>. vector<8xu16>) -> (vector<2xu64>)
+  //   (vector<16xs8>, vector<16xs8>) -> (vector<4xs32>)
+  //   (vector<8xs16>. vector<8xs16>) -> (vector<2xs64>)
+  //   ## unimplemented ## (vector<16xu8>, vector<16xs8>) -> (vector<4xs32>)
+  //   ## not going to implemente ## (vector<16xs8>, vector<16xu8>) -> (vector<4xs32>)
+  //   (vector<8xbf16>. vector<8xbf16>) -> (vector<4xf32>)
+  //   udot, sdot, usdot, #sudot#, bfdot
+//  let arguments = (ins
+//          AnyScalableVector:$acc,
+//          AnyScalableVector:$src1,
+//          AnyScalableVector:$src2
+//  );
+//  let results = (outs AnyScalableVector:$dst);
   let arguments = (ins
-          ScalableVectorOfLengthAndType<[4, 2], [I32, I64]>:$acc,
-          ScalableVectorOfLengthAndType<[16, 8], [I8, I16]>:$src1,
-          ScalableVectorOfLengthAndType<[16, 8], [I8, I16]>:$src2
+          ScalableVectorOf<[I32, I64, F32, SI32, SI64, UI32, UI64]>:$acc,
+          ScalableVectorOf<[I8, I16, BF16, SI8, SI16, UI8, UI16]>:$src1,
+          ScalableVectorOf<[I8, I16, BF16, SI8, SI16, UI8, UI16]>:$src2
   );
-  let results = (outs ScalableVectorOfLengthAndType<[4, 2], [I32, I64]>:$dst);
+  let results = (outs ScalableVectorOf<[I32, I64, F32, SI32,
+                                        SI64, UI32, UI64]>:$dst);
   let assemblyFormat =
     "$acc `,` $src1 `,` $src2 attr-dict `:` type($src1) `to` type($dst)";
+
+  let hasVerifier = 1;
 }
 
 def UmmlaOp : ArmSVE_Op<"ummla",
@@ -209,6 +240,17 @@ def UmmlaOp : ArmSVE_Op<"ummla",
     https://developer.arm.com/documentation/100987/0000
   }];
   // Supports (vector<16xi8>, vector<16xi8>) -> (vector<4xi32>)
+  // Supports (vector<16xs8>, vector<16xs8>) -> (vector<4xs32>)
+  // Supports (vector<16xu8>, vector<16xu8>) -> (vector<4xu32>)
+  // Supports (vector<16xu8>, vector<16xs8>) -> (vector<4xs32>)
+  // Supports (vector<8xbf16>, vector<8xbf16>) -> (vector<4xf32>)
+  // Supports (vector<2xf32>, vector<2xf32>) -> (vector<2xf32>)
+  // Supports (vector<2xf64>, vector<2xf64>) -> (vector<2xf64>)
+  //   mmla, ummla, smmla, usmmla, bfmmla (2x4 * 4x2 = 2x2)
+  //   fmmla (2x2 * 2x2 = 2x2)
+  //       It works for fp32 and fp64, if f64, the hw vector has to
+  //       be a multiple of 256b long.
+
   let arguments = (ins
           ScalableVectorOfLengthAndType<[4], [I32]>:$acc,
           ScalableVectorOfLengthAndType<[16], [I8]>:$src1,
@@ -293,6 +335,12 @@ def ScalableMaskedUDivIIntrOp :
 
 def ScalableMaskedDivFIntrOp :
   ArmSVE_IntrBinaryOverloadedOp<"fdiv">,
+//def UsdotIntrOp :
+//  ArmSVE_IntrBinaryOverloadedOp<"usdot">,
+//  Arguments<(ins AnyScalableVector, AnyScalableVector, AnyScalableVector)>;
+
+def BfdotIntrOp :
+  ArmSVE_IntrBinaryOverloadedOp<"bfdot">,
   Arguments<(ins AnyScalableVector, AnyScalableVector, AnyScalableVector)>;
 
 #endif // ARMSVE_OPS
