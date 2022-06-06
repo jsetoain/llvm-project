@@ -408,6 +408,36 @@ def LLVM_StepVectorOp
   let assemblyFormat = "attr-dict `:` type($res)";
 }
 
+/// Create a call to vector.insert intrinsic
+def LLVM_vector_insert
+    : LLVM_Op<"intr.experimental.vector.insert",
+                  [NoSideEffect, AllTypesMatch<["dstvec", "res"]>]> {
+  let arguments = (ins LLVM_AnyVector:$srcvec, LLVM_AnyScalableVector:$dstvec,
+                       I64Attr:$pos);
+  let results = (outs LLVM_AnyScalableVector:$res);
+  let builders = [LLVM_OneResultOpBuilder];
+  string llvmBuilder = [{
+    $res = builder.CreateInsertVector(
+        $_resultType, $dstvec, $srcvec, builder.getInt64($pos));
+  }];
+  let assemblyFormat = "$srcvec `,` $dstvec `[` $pos `]` attr-dict `:` "
+    "type($srcvec) `into` type($res)";
+}
+
+/// Create a call to vector.extract intrinsic
+def LLVM_vector_extract
+    : LLVM_Op<"intr.experimental.vector.extract", [NoSideEffect]> {
+  let arguments = (ins LLVM_AnyScalableVector:$srcvec, I64Attr:$pos);
+  let results = (outs LLVM_AnyVector:$res);
+  let builders = [LLVM_OneResultOpBuilder];
+  string llvmBuilder = [{
+    $res = builder.CreateExtractVector(
+        $_resultType, $srcvec, builder.getInt64($pos));
+  }];
+  let assemblyFormat = "$srcvec `[` $pos `]` attr-dict `:` "
+    "type($res) `from` type($srcvec)";
+}
+
 //
 // LLVM Vector Predication operations.
 //
