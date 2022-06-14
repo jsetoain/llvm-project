@@ -791,6 +791,29 @@ public:
   }
 };
 
+class VectorScalableCastOpRewritePattern
+    : public OpRewritePattern<ScalableCastOp> {
+public:
+  using OpRewritePattern<ScalableCastOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ScalableCastOp op,
+                                PatternRewriter &rewriter) const override {
+    auto resultType = op.getResultVectorType();
+    if (resultType.isScalable()) {
+      // Fixed-length to scalable cast
+      Value insVec = rewriter.create<arith::ConstantOp>(
+          op.getLoc(), resultType, rewriter.getZeroAttr(resultType));
+      rewriter.replaceOpWithNewOp<LLVM::vector_insert>(
+          op, op.getSource(), insVec, rewriter.getI64IntegerAttr(0));
+    } else {
+      // Scalable to fixed-length cast
+      rewriter.replaceOpWithNewOp<LLVM::vector_extract>(
+          op, resultType, op.getSource(), rewriter.getI64IntegerAttr(0));
+    }
+    return success();
+  }
+};
+
 /// Returns the strides if the memory underlying `memRefType` has a contiguous
 /// static layout.
 static llvm::Optional<SmallVector<int64_t, 4>>
@@ -1196,7 +1219,8 @@ void mlir::populateVectorToLLVMConversionPatterns(
     LLVMTypeConverter &converter, RewritePatternSet &patterns,
     bool reassociateFPReductions, bool force32BitVectorIndices) {
   MLIRContext *ctx = converter.getDialect()->getContext();
-  patterns.add<VectorFMAOpNDRewritePattern>(ctx);
+  patterns.add<VectorFMAOpNDRewritePattern, VectorScalableCastOpRewritePattern>(
+      ctx);
   populateVectorInsertExtractStridedSliceTransforms(patterns);
   patterns.add<VectorReductionOpConversion>(converter, reassociateFPReductions);
   patterns.add<VectorCreateMaskOpRewritePattern>(ctx, force32BitVectorIndices);

@@ -1612,3 +1612,27 @@ func.func @warp_mismatch_rank(%laneid: index) {
   }
   return
 }
+
+// -----
+
+func.func @scalable_cast_element_type_mismatch(%vin : vector<8xf32>) {
+  // expected-error@+1 {{op failed to verify that all of {source, result} have same element type}}
+  %0 = vector.scalable_cast %vin : vector<8xf32> to vector<[4]xbf16>
+  return
+}
+
+// -----
+
+func.func @scalable_cast_non_scalable_cast(%vin : vector<8xf32>) {
+  // expected-error@+1 {{op failed to verify that is a cast between scalable and fixed-length vector}}
+  %0 = vector.scalable_cast %vin : vector<8xf32> to vector<8xf32>
+  return
+}
+
+// -----
+
+func.func @scalable_cast_invalid_cast(%vin : vector<8xf32>) {
+  // expected-error@+1 {{op failed to verify that fixed number of elements is multiple of scalable number of elements}}
+  %0 = vector.scalable_cast %vin : vector<8xf32> to vector<[16]xf32>
+  return
+}

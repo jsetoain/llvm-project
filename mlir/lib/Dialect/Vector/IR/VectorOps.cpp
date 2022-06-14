@@ -4202,6 +4202,17 @@ void ShapeCastOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// VectorScalableCastOp
+//===----------------------------------------------------------------------===//
+
+OpFoldResult ScalableCastOp::fold(ArrayRef<Attribute> operands) {
+  if (auto otherOp = getSource().getDefiningOp<ScalableCastOp>())
+    if (getResult().getType() == otherOp.getSource().getType())
+      return otherOp.getSource();
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
 // VectorBitCastOp
 //===----------------------------------------------------------------------===//
 

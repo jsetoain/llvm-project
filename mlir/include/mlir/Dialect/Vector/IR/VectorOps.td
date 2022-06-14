@@ -2052,6 +2052,67 @@ def Vector_ShapeCastOp :
   let hasVerifier = 1;
 }
 
+def Vector_ScalableCastOp :
+  Vector_Op<"scalable_cast", [NoSideEffect,
+    AllElementTypesMatch<["source", "result"]>,
+    PredOpTrait<"is a cast between scalable and fixed-length vectors", CPred<
+      "getSourceVectorType().isScalable() != getResultVectorType().isScalable()"
+      >>,
+    PredOpTrait<"fixed number of elements is multiple of scalable number of elements",
+      Or<[
+        And<[CPred<"getSourceVectorType().isScalable()">,
+             Neg<CPred<"getResultVectorType().getNumElements() % getSourceVectorType().getNumElements()">>]>,
+        And<[CPred<"getResultVectorType().isScalable()">,
+             Neg<CPred<"getSourceVectorType().getNumElements() % getResultVectorType().getNumElements()">>]>
+         ]>>
+  ]>,
+    Arguments<(ins VectorOfRank<[1]>:$source)>,
+    Results<(outs VectorOfRank<[1]>:$result)> {
+  let summary = "scalable_cast casts between scalable and fixed-length vectors";
+  let description = [{
+    The scalable_cast operation performs the cast between a scalable vector and
+    a fixed-length vector by assuming a vector scale.
+
+    This operation allows to interface VLS (Vector-Length Specific) code with
+    scalable vector functions and operations, such as the ones found in the
+    ArmSVE dialect.
+
+    The scalable_cast operation doesn't allow a cast between element types. If
+    needed, an element-type cast should be performed before or after the cast
+    between scalable and fixed-length types.
+
+    For the cast to be valid, the number of dimensions of the fixed-length
+    vector must be a multiple of the scalable vector.
+
+    Example:
+
+    ```mlir
+    // Casting from a scalable vector to a fixed-length vector assuming a
+    // vector scale of 2
+    %1 = vector.scalable_cast %0 : vector<[32]xf32> to vector<64xf32>
+
+    // Casting from a fixed-length vector to a scalable vector assuming a
+    // vector scale of 16
+    %3 = vector.scalable_cast %2 : vector<128xf32> to vector<[8]xf32>
+
+    // Casting from a fixed-length vector to a scalable vector assuming a
+    // vector scale of 1
+    %5 = vector.scalable_cast %4 : vector<8xbf16> to vector<[8]xbf16>
+
+    ```
+  }];
+  let extraClassDeclaration = [{
+    VectorType getSourceVectorType() {
+      return getSource().getType().cast<VectorType>();
+    }
+    VectorType getResultVectorType() {
+      return getResult().getType().cast<VectorType>();
+    }
+  }];
+  let assemblyFormat = "$source attr-dict `:` type($source) `to` type($result)";
+  let hasFolder = 1;
+}
+
 def Vector_BitCastOp :
   Vector_Op<"bitcast", [NoSideEffect, AllRanksMatch<["source", "result"]>]>,
     Arguments<(ins AnyVectorOfAnyRank:$source)>,

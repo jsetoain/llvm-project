@@ -771,4 +771,16 @@ func.func @warp_operand_result(%laneid: index, %v0 : vector<4xi32>) -> (vector<4
   return %2 : vector<4xi32>
 }
 
-
+// CHECK-LABEL: @vector_scalable_casts
+func.func @vector_scalable_casts(%0: vector<8xf32>,
+                                 %1: vector<[4]xf32>) {
+  // CHECK-NEXT: %{{.*}} = vector.scalable_cast %{{.*}}: vector<8xf32> to vector<[8]xf32>
+  %2 = vector.scalable_cast %0 : vector<8xf32> to vector<[8]xf32>
+  // CHECK-NEXT: %{{.*}} = vector.scalable_cast %{{.*}}: vector<8xf32> to vector<[4]xf32>
+  %3 = vector.scalable_cast %0 : vector<8xf32> to vector<[4]xf32>
+  // CHECK-NEXT: %{{.*}} = vector.scalable_cast %{{.*}}: vector<[4]xf32> to vector<4xf32>
+  %4 = vector.scalable_cast %1 : vector<[4]xf32> to vector<4xf32>
+  // CHECK-NEXT: %{{.*}} = vector.scalable_cast %{{.*}}: vector<[4]xf32> to vector<8xf32>
+  %5 = vector.scalable_cast %1 : vector<[4]xf32> to vector<8xf32>
+  return
+}

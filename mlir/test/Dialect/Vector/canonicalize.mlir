@@ -1605,3 +1605,14 @@ func.func @dont_reduce_one_element_vector(%a : vector<4xf32>) -> f32 {
   %s = vector.reduction <add>, %a : vector<4xf32> into f32
   return %s : f32
 }
+
+// -----
+
+// CHECK-LABEL: func @scalable_cast_fold_complementary
+//  CHECK-SAME: (%[[V:.+]]: vector<8xf32>)
+//       CHECK-NEXT: return %[[V]] : vector<8xf32>
+func.func @scalable_cast_fold_complementary(%a : vector<8xf32>) -> vector<8xf32> {
+  %0 = vector.scalable_cast %a : vector<8xf32> to vector<[4]xf32>
+  %1 = vector.scalable_cast %0 : vector<[4]xf32> to vector<8xf32>
+  return %1 : vector<8xf32>
+}

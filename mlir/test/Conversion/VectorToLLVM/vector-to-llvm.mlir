@@ -1814,3 +1814,30 @@ func.func @splat(%a: vector<4xf32>, %b: f32) -> vector<4xf32> {
 // CHECK-NEXT: %[[SPLAT:[0-9]+]] = llvm.shufflevector %[[V]], %[[UNDEF]] [0 : i32, 0 : i32, 0 : i32, 0 : i32]
 // CHECK-NEXT: %[[SCALE:[0-9]+]] = arith.mulf %[[A]], %[[SPLAT]] : vector<4xf32>
 // CHECK-NEXT: return %[[SCALE]] : vector<4xf32>
+
+// -----
+
+// CHECK-LABEL: @scalable_cast_fixed_to_scalable
+// CHECK-SAME: %[[A:arg[0-9]+]]: vector<8xi32>
+func.func @scalable_cast_fixed_to_scalable(%a: vector<8xi32>)
+        -> vector<[4]xi32> {
+  // CHECK-NEXT: %[[C0:.*]] = arith.constant dense<0> : vector<[4]xi32>
+  // CHECK-NEXT: %[[R:[0-9]+]] = llvm.intr.experimental.vector.insert
+  // CHECK-SAME: %[[A]], %[[C0]][0] : vector<8xi32> into vector<[4]xi32>
+  // CHECK-NEXT: return %[[R]] : vector<[4]xi32>
+  %0 = vector.scalable_cast %a : vector<8xi32> to vector<[4]xi32>
+  return %0 : vector<[4]xi32>
+}
+
+// -----
+
+// CHECK-LABEL: @scalable_cast_scalable_to_fixed
+// CHECK-SAME: %[[A:arg[0-9]+]]: vector<[4]xf32>
+func.func @scalable_cast_scalable_to_fixed(%a: vector<[4]xf32>)
+        -> vector<8xf32> {
+  // CHECK-NEXT: %[[R:[0-9]+]] = llvm.intr.experimental.vector.extract
+  // CHECK-SAME: %[[A]][0] : vector<8xf32> from vector<[4]xf32>
+  // CHECK-NEXT: return %[[R]] : vector<8xf32>
+  %0 = vector.scalable_cast %a : vector<[4]xf32> to vector<8xf32>
+  return %0 : vector<8xf32>
+}
