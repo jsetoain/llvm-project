@@ -765,6 +765,113 @@ def Vector_InsertOp :
   let hasVerifier = 1;
 }
 
+def Vector_ScalableInsertOp :
+  Vector_Op<"scalable.insert", [NoSideEffect,
+       AllElementTypesMatch<["source", "dest"]>,
+       AllTypesMatch<["dest", "res"]>,
+       PredOpTrait<"position is a multiple of the source length.",
+        CPred<
+          "(getPos() % getSourceVectorType().getNumElements()) == 0"
+        >>]>,
+     Arguments<(ins VectorOfRank<[1]>:$source,
+                    ScalableVectorOfRank<[1]>:$dest,
+                    I64Attr:$pos)>,
+     Results<(outs ScalableVectorOfRank<[1]>:$res)> {
+  let summary = "insert subvector into scalable vector operation";
+  let description = [{
+    Takes rank-1 fixed-length or scalable source `n-D` subvector, a rank-1
+    destination `m-D` vector, a position `pos` within the destination vector.
+    If `source` is fixed-length, it inserts the elements `(0, ..., n-1)` of the
+    `n-D` subvector into the scalable vector, starting from the specified
+    position `pos`, and up to `(pos + n - 1)`. If source vector is scalable,
+    the insertion position will be scaled by the runtime vector scale
+    `vscale`, and the source elements `(0, ..., vscale * n - 1)` will be
+    inserted in the destination from position `(vscale * pos)`, and up to
+    `(vscale * pos + vscale * n - 1)`.
+
+    The insertion position must be a multiple of the minimum size of the source
+    vector. For the operation to be well defined, the source vector must fit in
+    the destination vector from the specified position. Since the destination
+    vector is scalable and its runtime length is unknown, it can't be verified
+    and/or guaranteed at compile time.
+
+    Example:
+
+    ```mlir
+    %2 = vector.scalable.insert %0, %1[8] : vector<4xf32> into vector<[16]xf32>
+    %5 = vector.scalable.insert %3, %4[0] : vector<8xf32> into vector<[4]xf32>
+    %8 = vector.scalable.insert %6, %7[0] : vector<[4]xf32> into vector<[8]xf32>
+    ```
+
+    Invalid example:
+    ```mlir
+    %2 = vector.scalable.insert %0, %1[5] : vector<4xf32> into vector<[16]xf32>
+    ```
+  }];
+
+  let assemblyFormat = [{
+    $source `,` $dest `[` $pos `]` attr-dict `:` type($source) `into` type($dest)
+  }];
+
+  let extraClassDeclaration = [{
+    VectorType getSourceVectorType() {
+      return getSource().getType().cast<VectorType>();
+    }
+    VectorType getDestVectorType() {
+      return getDest().getType().cast<VectorType>();
+    }
+  }];
+}
+
+def Vector_ScalableExtractOp :
+  Vector_Op<"scalable.extract", [NoSideEffect,
+       AllElementTypesMatch<["source", "res"]>,
+       PredOpTrait<"position is a multiple of the result length.",
+        CPred<
+          "(getPos() % getResultVectorType().getNumElements()) == 0"
+        >>]>,
+     Arguments<(ins ScalableVectorOfRank<[1]>:$source,
+                    I64Attr:$pos)>,
+     Results<(outs VectorOfRank<[1]>:$res)> {
+  let summary = "extract subvector from scalable vector operation";
+  let description = [{
+    Takes rank-1 `n-D` source vector and a position `pos` within the source
+    vector, and extracts the elements `(pos, ..., pos + m - 1)` from the `n-D`
+    source vector into a new rank-1 `m-D` vector.
+
+    The extraction position must be a multiple of the minimum size of the result
+    vector. For the operation to be well defined, the destination vector must
+    fit in the source vector from the specified position. Since the source
+    vector is scalable and its runtime length is unknown, it can't be verified
+    and/or guaranteed at compile time.
+
+    Example:
+
+    ```mlir
+    %1 = vector.scalable.extract %0[8] : vector<4xf32> from vector<[8]xf32>
+    %3 = vector.scalable.extract %2[0] : vector<[4]xf32> from vector<[8]xf32>
+    ```
+
+    Invalid example:
+    ```mlir
+    %1 = vector.scalable.extract %0[5] : vector<4xf32> from vector<[16]xf32>
+    ```
+  }];
+
+  let assemblyFormat = [{
+    $source `[` $pos `]` attr-dict `:` type($res) `from` type($source)
+  }];
+
+  let extraClassDeclaration = [{
+    VectorType getSourceVectorType() {
+      return getSource().getType().cast<VectorType>();
+    }
+    VectorType getResultVectorType() {
+      return getRes().getType().cast<VectorType>();
+    }
+  }];
+}
+
 def Vector_InsertMapOp :
   Vector_Op<"insert_map", [NoSideEffect, AllTypesMatch<["dest", "result"]>]>,
     Arguments<(ins AnyVector:$vector, AnyVector:$dest, Variadic<Index>:$ids)>,
