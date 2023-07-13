@@ -92,8 +92,10 @@ func.func @tensor_transfer_write_0d(%t: tensor<?x?x?xf32>, %idx: index, %f: f32)
 func.func @transfer_read_2d_extract(%m: memref<?x?x?x?xf32>, %idx: index, %idx2: index) -> f32 {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c8 = arith.constant 8 : index
   %0 = vector.transfer_read %m[%idx, %idx, %idx, %idx], %cst {in_bounds = [true, true]} : memref<?x?x?x?xf32>, vector<10x5xf32>
-  %1 = vector.extract %0[8, 1] : vector<10x5xf32>
+  %1 = vector.extract %0[%c8, %c1] : vector<10x5xf32>
   return %1 : f32
 }
 
@@ -101,8 +103,9 @@ func.func @transfer_read_2d_extract(%m: memref<?x?x?x?xf32>, %idx: index, %idx2:
 
 // CHECK-LABEL: func @transfer_write_arith_constant(
 //  CHECK-SAME:     %[[m:.*]]: memref<?x?x?xf32>, %[[idx:.*]]: index
+//       CHECK:   %[[c0:.*]] = arith.constant 0 : index
 //       CHECK:   %[[cst:.*]] = arith.constant dense<5.000000e+00> : vector<1x1xf32>
-//       CHECK:   %[[extract:.*]] = vector.extract %[[cst]][0, 0] : vector<1x1xf32>
+//       CHECK:   %[[extract:.*]] = vector.extract %[[cst]][%[[c0]], %[[c0]]] : vector<1x1xf32>
 //       CHECK:   memref.store %[[extract]], %[[m]][%[[idx]], %[[idx]], %[[idx]]]
 func.func @transfer_write_arith_constant(%m: memref<?x?x?xf32>, %idx: index) {
   %cst = arith.constant dense<5.000000e+00> : vector<1x1xf32>
@@ -115,9 +118,11 @@ func.func @transfer_write_arith_constant(%m: memref<?x?x?xf32>, %idx: index) {
 // CHECK-LABEL: func @transfer_read_multi_use(
 //  CHECK-SAME:   %[[m:.*]]: memref<?xf32>, %[[idx:.*]]: index
 //   CHECK-NOT:   memref.load
+//       CHECK:   %[[c0:.*]] = arith.constant 0 : index
+//       CHECK:   %[[c1:.*]] = arith.constant 1 : index
 //       CHECK:   %[[r:.*]] = vector.transfer_read %[[m]][%[[idx]]]
-//       CHECK:   %[[e0:.*]] = vector.extract %[[r]][0]
-//       CHECK:   %[[e1:.*]] = vector.extract %[[r]][1]
+//       CHECK:   %[[e0:.*]] = vector.extract %[[r]][%[[c0]]]
+//       CHECK:   %[[e1:.*]] = vector.extract %[[r]][%[[c1]]]
 //       CHECK:   return %[[e0]], %[[e1]]
 
 // MULTIUSE-LABEL: func @transfer_read_multi_use(
@@ -129,10 +134,12 @@ func.func @transfer_write_arith_constant(%m: memref<?x?x?xf32>, %idx: index) {
 //       MULTIUSE:   return %[[r0]], %[[r1]]
 
 func.func @transfer_read_multi_use(%m: memref<?xf32>, %idx: index) -> (f32, f32) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %cst = arith.constant 0.0 : f32
   %0 = vector.transfer_read %m[%idx], %cst {in_bounds = [true]} : memref<?xf32>, vector<16xf32>
-  %1 = vector.extract %0[0] : vector<16xf32>
-  %2 = vector.extract %0[1] : vector<16xf32>
+  %1 = vector.extract %0[%c0] : vector<16xf32>
+  %2 = vector.extract %0[%c1] : vector<16xf32>
   return %1, %2 : f32, f32
 }
 
@@ -142,14 +149,16 @@ func.func @transfer_read_multi_use(%m: memref<?xf32>, %idx: index) -> (f32, f32)
 // CHECK-LABEL: func @subvector_extract(
 //  CHECK-SAME:   %[[m:.*]]: memref<?x?xf32>, %[[idx:.*]]: index
 //   CHECK-NOT:   memref.load
+//       CHECK:   %[[c0:.*]] = arith.constant 0 : index
 //       CHECK:   %[[r:.*]] = vector.transfer_read %[[m]][%[[idx]], %[[idx]]]
-//       CHECK:   %[[e0:.*]] = vector.extract %[[r]][0]
+//       CHECK:   %[[e0:.*]] = vector.extract %[[r]][%[[c0]]]
 //       CHECK:   return %[[e0]]
 
 func.func @subvector_extract(%m: memref<?x?xf32>, %idx: index) -> vector<16xf32> {
+  %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f32
   %0 = vector.transfer_read %m[%idx, %idx], %cst {in_bounds = [true, true]} : memref<?x?xf32>, vector<8x16xf32>
-  %1 = vector.extract %0[0] : vector<8x16xf32>
+  %1 = vector.extract %0[%c0] : vector<8x16xf32>
   return %1 : vector<16xf32>
 }
 
