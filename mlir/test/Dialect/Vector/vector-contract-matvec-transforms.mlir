@@ -59,15 +59,17 @@
 // CHECK-SAME: %[[A:.*0]]: memref<vector<2x2xf32>>
 // CHECK-SAME: %[[B:.*1]]: memref<vector<2xf32>>
 // CHECK-SAME: %[[C:.*2]]: memref<vector<2xf32>>
+// CHECK: %[[C0:.*]] = arith.constant 0 : index
+// CHECK: %[[C1:.*]] = arith.constant 1 : index
 // CHECK: %[[T0:.*]] = memref.load %[[A]][] : memref<vector<2x2xf32>>
 // CHECK: %[[T1:.*]] = memref.load %[[B]][] : memref<vector<2xf32>>
 // CHECK: %[[T2:.*]] = memref.load %[[C]][] : memref<vector<2xf32>>
 // CHECK: %[[T3:.*]] = vector.transpose %[[T0]], [1, 0] : vector<2x2xf32> to vector<2x2xf32>
-// CHECK: %[[T4:.*]] = vector.extract %[[T3]][0] : vector<2x2xf32>
-// CHECK: %[[T5:.*]] = vector.extract %[[T1]][0] : vector<2xf32>
+// CHECK: %[[T4:.*]] = vector.extract %[[T3]][%[[C0]]] : vector<2x2xf32>
+// CHECK: %[[T5:.*]] = vector.extract %[[T1]][%[[C0]]] : vector<2xf32>
 // CHECK: %[[T6:.*]] = vector.outerproduct %[[T4]], %[[T5]], %[[T2]] {kind = #vector.kind<add>} : vector<2xf32>, f32
-// CHECK: %[[T7:.*]] = vector.extract %[[T3]][1] : vector<2x2xf32>
-// CHECK: %[[T8:.*]] = vector.extract %[[T1]][1] : vector<2xf32>
+// CHECK: %[[T7:.*]] = vector.extract %[[T3]][%[[C1]]] : vector<2x2xf32>
+// CHECK: %[[T8:.*]] = vector.extract %[[T1]][%[[C1]]] : vector<2xf32>
 // CHECK: %[[T9:.*]] = vector.outerproduct %[[T7]], %[[T8]], %[[T6]] {kind = #vector.kind<add>} : vector<2xf32>, f32
 // CHECK: memref.store %[[T9]], %[[C]][] : memref<vector<2xf32>>
 // CHECK: return
@@ -85,15 +87,17 @@ func.func @matvec2x2(%arg0: memref<vector<2x2xf32>>, %arg1: memref<vector<2xf32>
 // CHECK-SAME: %[[A:.*0]]: memref<vector<2x2xf32>>
 // CHECK-SAME: %[[B:.*1]]: memref<vector<2xf32>>
 // CHECK-SAME: %[[C:.*2]]: memref<vector<2xf32>>
+// CHECK: %[[C0:.*]] = arith.constant 0 : index
+// CHECK: %[[C1:.*]] = arith.constant 1 : index
 // CHECK: %[[T0:.*]] = memref.load %[[A]][] : memref<vector<2x2xf32>>
 // CHECK: %[[T1:.*]] = memref.load %[[B]][] : memref<vector<2xf32>>
 // CHECK: %[[T2:.*]] = memref.load %[[C]][] : memref<vector<2xf32>>
 // CHECK: %[[T3:.*]] = vector.transpose %[[T0]], [1, 0] : vector<2x2xf32> to vector<2x2xf32>
-// CHECK: %[[T4:.*]] = vector.extract %[[T3]][0] : vector<2x2xf32>
-// CHECK: %[[T5:.*]] = vector.extract %[[T1]][0] : vector<2xf32>
+// CHECK: %[[T4:.*]] = vector.extract %[[T3]][%[[C0]]] : vector<2x2xf32>
+// CHECK: %[[T5:.*]] = vector.extract %[[T1]][%[[C0]]] : vector<2xf32>
 // CHECK: %[[T6:.*]] = vector.outerproduct %[[T4]], %[[T5]], %[[T2]] {kind = #vector.kind<maxf>} : vector<2xf32>, f32
-// CHECK: %[[T7:.*]] = vector.extract %[[T3]][1] : vector<2x2xf32>
-// CHECK: %[[T8:.*]] = vector.extract %[[T1]][1] : vector<2xf32>
+// CHECK: %[[T7:.*]] = vector.extract %[[T3]][%[[C1]]] : vector<2x2xf32>
+// CHECK: %[[T8:.*]] = vector.extract %[[T1]][%[[C1]]] : vector<2xf32>
 // CHECK: %[[T9:.*]] = vector.outerproduct %[[T7]], %[[T8]], %[[T6]] {kind = #vector.kind<maxf>} : vector<2xf32>, f32
 // CHECK: memref.store %[[T9]], %[[C]][] : memref<vector<2xf32>>
 // CHECK: return
@@ -111,14 +115,16 @@ func.func @matvecmax2x2(%arg0: memref<vector<2x2xf32>>, %arg1: memref<vector<2xf
 // CHECK-SAME: %[[A:.*0]]: memref<vector<2x2xf32>>
 // CHECK-SAME: %[[B:.*1]]: memref<vector<2xf32>>
 // CHECK-SAME: %[[C:.*2]]: memref<vector<2xf32>>
+// CHECK: %[[C0:.*]] = arith.constant 0 : index
+// CHECK: %[[C1:.*]] = arith.constant 1 : index
 // CHECK: %[[T0:.*]] = memref.load %[[A]][] : memref<vector<2x2xf32>>
 // CHECK: %[[T1:.*]] = memref.load %[[B]][] : memref<vector<2xf32>>
 // CHECK: %[[T2:.*]] = memref.load %[[C]][] : memref<vector<2xf32>>
-// CHECK: %[[T3:.*]] = vector.extract %[[T0]][0] : vector<2x2xf32>
-// CHECK: %[[T4:.*]] = vector.extract %[[T1]][0] : vector<2xf32>
+// CHECK: %[[T3:.*]] = vector.extract %[[T0]][%[[C0]]] : vector<2x2xf32>
+// CHECK: %[[T4:.*]] = vector.extract %[[T1]][%[[C0]]] : vector<2xf32>
 // CHECK: %[[T5:.*]] = vector.outerproduct %[[T3]], %[[T4]], %[[T2]] {kind = #vector.kind<add>} : vector<2xf32>, f32
-// CHECK: %[[T6:.*]] = vector.extract %[[T0]][1] : vector<2x2xf32>
-// CHECK: %[[T7:.*]] = vector.extract %[[T1]][1] : vector<2xf32>
+// CHECK: %[[T6:.*]] = vector.extract %[[T0]][%[[C1]]] : vector<2x2xf32>
+// CHECK: %[[T7:.*]] = vector.extract %[[T1]][%[[C1]]] : vector<2xf32>
 // CHECK: %[[T8:.*]] = vector.outerproduct %[[T6]], %[[T7]], %[[T5]] {kind = #vector.kind<add>} : vector<2xf32>, f32
 // CHECK: memref.store %[[T8]], %[[C]][] : memref<vector<2xf32>>
 // CHECK: return
@@ -136,15 +142,17 @@ func.func @mattransvec2x2(%arg0: memref<vector<2x2xf32>>, %arg1: memref<vector<2
 // CHECK-SAME: %[[A:.*0]]: memref<vector<2x2xf32>>
 // CHECK-SAME: %[[B:.*1]]: memref<vector<2xf32>>
 // CHECK-SAME: %[[C:.*2]]: memref<vector<2xf32>>
+// CHECK: %[[C0:.*]] = arith.constant 0 : index
+// CHECK: %[[C1:.*]] = arith.constant 1 : index
 // CHECK: %[[T0:.*]] = memref.load %[[A]][] : memref<vector<2x2xf32>>
 // CHECK: %[[T1:.*]] = memref.load %[[B]][] : memref<vector<2xf32>>
 // CHECK: %[[T2:.*]] = memref.load %[[C]][] : memref<vector<2xf32>>
 // CHECK: %[[T3:.*]] = vector.transpose %[[T0]], [1, 0] : vector<2x2xf32> to vector<2x2xf32>
-// CHECK: %[[T4:.*]] = vector.extract %[[T3]][0] : vector<2x2xf32>
-// CHECK: %[[T5:.*]] = vector.extract %[[T1]][0] : vector<2xf32>
+// CHECK: %[[T4:.*]] = vector.extract %[[T3]][%[[C0]]] : vector<2x2xf32>
+// CHECK: %[[T5:.*]] = vector.extract %[[T1]][%[[C0]]] : vector<2xf32>
 // CHECK: %[[T6:.*]] = vector.outerproduct %[[T4]], %[[T5]], %[[T2]] {kind = #vector.kind<add>} : vector<2xf32>, f32
-// CHECK: %[[T7:.*]] = vector.extract %[[T3]][1] : vector<2x2xf32>
-// CHECK: %[[T8:.*]] = vector.extract %[[T1]][1] : vector<2xf32>
+// CHECK: %[[T7:.*]] = vector.extract %[[T3]][%[[C1]]] : vector<2x2xf32>
+// CHECK: %[[T8:.*]] = vector.extract %[[T1]][%[[C1]]] : vector<2xf32>
 // CHECK: %[[T9:.*]] = vector.outerproduct %[[T7]], %[[T8]], %[[T6]] {kind = #vector.kind<add>} : vector<2xf32>, f32
 // CHECK: memref.store %[[T9]], %[[C]][] : memref<vector<2xf32>>
 // CHECK: return
@@ -162,14 +170,16 @@ func.func @vecmat2x2(%arg0: memref<vector<2x2xf32>>, %arg1: memref<vector<2xf32>
 // CHECK-SAME: %[[A:.*0]]: memref<vector<2x2xf32>>
 // CHECK-SAME: %[[B:.*1]]: memref<vector<2xf32>>
 // CHECK-SAME: %[[C:.*2]]: memref<vector<2xf32>>
+// CHECK: %[[C0:.*]] = arith.constant 0 : index
+// CHECK: %[[C1:.*]] = arith.constant 1 : index
 // CHECK: %[[T0:.*]] = memref.load %[[A]][] : memref<vector<2x2xf32>>
 // CHECK: %[[T1:.*]] = memref.load %[[B]][] : memref<vector<2xf32>>
 // CHECK: %[[T2:.*]] = memref.load %[[C]][] : memref<vector<2xf32>>
-// CHECK: %[[T3:.*]] = vector.extract %[[T0]][0] : vector<2x2xf32>
-// CHECK: %[[T4:.*]] = vector.extract %[[T1]][0] : vector<2xf32>
+// CHECK: %[[T3:.*]] = vector.extract %[[T0]][%[[C0]]] : vector<2x2xf32>
+// CHECK: %[[T4:.*]] = vector.extract %[[T1]][%[[C0]]] : vector<2xf32>
 // CHECK: %[[T5:.*]] = vector.outerproduct %[[T3]], %[[T4]], %[[T2]] {kind = #vector.kind<add>} : vector<2xf32>, f32
-// CHECK: %[[T6:.*]] = vector.extract %[[T0]][1] : vector<2x2xf32>
-// CHECK: %[[T7:.*]] = vector.extract %[[T1]][1] : vector<2xf32>
+// CHECK: %[[T6:.*]] = vector.extract %[[T0]][%[[C1]]] : vector<2x2xf32>
+// CHECK: %[[T7:.*]] = vector.extract %[[T1]][%[[C1]]] : vector<2xf32>
 // CHECK: %[[T8:.*]] = vector.outerproduct %[[T6]], %[[T7]], %[[T5]] {kind = #vector.kind<add>} : vector<2xf32>, f32
 // CHECK: memref.store %[[T8]], %[[C]][] : memref<vector<2xf32>>
 // CHECK: return
@@ -187,14 +197,16 @@ func.func @vecmattrans2x2(%arg0: memref<vector<2x2xf32>>, %arg1: memref<vector<2
 // CHECK-SAME: %[[A:.*0]]: memref<vector<2x2xf32>>
 // CHECK-SAME: %[[B:.*1]]: memref<vector<2xf32>>
 // CHECK-SAME: %[[C:.*2]]: memref<vector<2xf32>>
+// CHECK: %[[C0:.*]] = arith.constant 0 : index
+// CHECK: %[[C1:.*]] = arith.constant 1 : index
 // CHECK: %[[T0:.*]] = memref.load %[[A]][] : memref<vector<2x2xf32>>
 // CHECK: %[[T1:.*]] = memref.load %[[B]][] : memref<vector<2xf32>>
 // CHECK: %[[T2:.*]] = memref.load %[[C]][] : memref<vector<2xf32>>
-// CHECK: %[[T3:.*]] = vector.extract %[[T0]][0] : vector<2x2xf32>
-// CHECK: %[[T4:.*]] = vector.extract %[[T1]][0] : vector<2xf32>
+// CHECK: %[[T3:.*]] = vector.extract %[[T0]][%[[C0]]] : vector<2x2xf32>
+// CHECK: %[[T4:.*]] = vector.extract %[[T1]][%[[C0]]] : vector<2xf32>
 // CHECK: %[[T5:.*]] = vector.outerproduct %[[T3]], %[[T4]], %[[T2]] {kind = #vector.kind<add>} : vector<2xf32>, f32
-// CHECK: %[[T6:.*]] = vector.extract %[[T0]][1] : vector<2x2xf32>
-// CHECK: %[[T7:.*]] = vector.extract %[[T1]][1] : vector<2xf32>
+// CHECK: %[[T6:.*]] = vector.extract %[[T0]][%[[C1]]] : vector<2x2xf32>
+// CHECK: %[[T7:.*]] = vector.extract %[[T1]][%[[C1]]] : vector<2xf32>
 // CHECK: %[[T8:.*]] = vector.outerproduct %[[T6]], %[[T7]], %[[T5]] {kind = #vector.kind<add>} : vector<2xf32>, f32
 // CHECK: memref.store %[[T8]], %[[C]][] : memref<vector<2xf32>>
 // CHECK: return
