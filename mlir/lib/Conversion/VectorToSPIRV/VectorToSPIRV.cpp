@@ -34,6 +34,9 @@ using namespace mlir;
 
 /// Gets the first integer value from `attr`, assuming it is an integer array
 /// attribute.
+static uint64_t getFirstIntValue(ValueRange values) {
+  return values[0].getDefiningOp<arith::ConstantIndexOp>().value();
+}
 static uint64_t getFirstIntValue(ArrayAttr attr) {
   return (*attr.getAsValueRange<IntegerAttr>().begin()).getZExtValue();
 }

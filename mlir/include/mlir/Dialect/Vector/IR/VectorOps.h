@@ -14,6 +14,7 @@
 #define MLIR_DIALECT_VECTOR_IR_VECTOROPS_H
 
 #include "mlir/Bytecode/BytecodeOpInterface.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Vector/Interfaces/MaskableOpInterface.h"
 #include "mlir/Dialect/Vector/Interfaces/MaskingOpInterface.h"
 #include "mlir/IR/AffineMap.h"
@@ -133,6 +134,15 @@ inline bool isParallelIterator(Attribute attr) {
 inline bool isReductionIterator(Attribute attr) {
   return cast<IteratorTypeAttr>(attr).getValue() == IteratorType::reduction;
 }
+
+/// Returns the integer numbers in `values`. `values` are expected to be
+/// constant operations.
+SmallVector<int64_t> getAsIntegers(ArrayRef<Value> values);
+
+/// Returns the constant index ops in `values`. `values` are expected to be
+/// constant operations.
+SmallVector<arith::ConstantIndexOp>
+getAsConstantIndexOps(ArrayRef<Value> values);
 
 //===----------------------------------------------------------------------===//
 // Vector Masking Utilities

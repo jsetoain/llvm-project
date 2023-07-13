@@ -703,10 +703,9 @@ class RewriteScalarExtractOfTransferRead
     auto xferOp = extractOp.getVector().getDefiningOp<vector::TransferReadOp>();
     SmallVector<Value> newIndices(xferOp.getIndices().begin(),
                                   xferOp.getIndices().end());
-    for (const auto &it : llvm::enumerate(extractOp.getPosition())) {
-      int64_t offset = cast<IntegerAttr>(it.value()).getInt();
-      int64_t idx =
-          newIndices.size() - extractOp.getPosition().size() + it.index();
+    for (auto [i, pos] : llvm::enumerate(extractOp.getPosition())) {
+      int64_t offset = pos.getDefiningOp<arith::ConstantIndexOp>().value();
+      int64_t idx = newIndices.size() - extractOp.getPosition().size() + i;
       OpFoldResult ofr = affine::makeComposedFoldedAffineApply(
           rewriter, extractOp.getLoc(),
           rewriter.getAffineSymbolExpr(0) + offset, {newIndices[idx]});

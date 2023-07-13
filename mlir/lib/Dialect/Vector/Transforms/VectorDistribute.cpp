@@ -944,11 +944,10 @@ struct WarpOpExtract : public OpRewritePattern<WarpExecuteOnLane0Op> {
     // Rewrite vector.extract with 1d source to vector.extractelement.
     if (extractSrcType.getRank() == 1) {
       assert(extractOp.getPosition().size() == 1 && "expected 1 index");
-      int64_t pos = cast<IntegerAttr>(extractOp.getPosition()[0]).getInt();
+      Value pos = extractOp.getPosition()[0];
       rewriter.setInsertionPoint(extractOp);
       rewriter.replaceOpWithNewOp<vector::ExtractElementOp>(
-          extractOp, extractOp.getVector(),
-          rewriter.create<arith::ConstantIndexOp>(loc, pos));
+          extractOp, extractOp.getVector(), pos);
       return success();
     }
 
@@ -1201,11 +1200,10 @@ struct WarpOpInsert : public OpRewritePattern<WarpExecuteOnLane0Op> {
     // Rewrite vector.insert with 1d dest to vector.insertelement.
     if (insertOp.getDestVectorType().getRank() == 1) {
       assert(insertOp.getPosition().size() == 1 && "expected 1 index");
-      int64_t pos = cast<IntegerAttr>(insertOp.getPosition()[0]).getInt();
+      Value pos = insertOp.getPosition()[0];
       rewriter.setInsertionPoint(insertOp);
       rewriter.replaceOpWithNewOp<vector::InsertElementOp>(
-          insertOp, insertOp.getSource(), insertOp.getDest(),
-          rewriter.create<arith::ConstantIndexOp>(loc, pos));
+          insertOp, insertOp.getSource(), insertOp.getDest(), pos);
       return success();
     }
 
@@ -1276,10 +1274,8 @@ struct WarpOpInsert : public OpRewritePattern<WarpExecuteOnLane0Op> {
     } else {
       // One lane inserts the entire source vector.
       int64_t elementsPerLane = distrDestType.getDimSize(distrDestDim);
-      SmallVector<int64_t> newPos = llvm::to_vector(
-          llvm::map_range(insertOp.getPosition(), [](Attribute attr) {
-            return cast<IntegerAttr>(attr).getInt();
-          }));
+      SmallVector<Value> pos = insertOp.getPosition();
+      SmallVector<int64_t> newPos = getAsIntegers(pos);
       // tid of inserting lane: pos / elementsPerLane
       Value insertingLane = rewriter.create<arith::ConstantIndexOp>(
           loc, newPos[distrDestDim] / elementsPerLane);

@@ -577,7 +577,7 @@ def Vector_ExtractOp :
      PredOpTrait<"operand and result have same element type",
                  TCresVTEtIsSameAsOpBase<0, 0>>,
      DeclareOpInterfaceMethods<InferTypeOpInterface>]>,
-    Arguments<(ins AnyVectorOfAnyRank:$vector, I64ArrayAttr:$position)>,
+    Arguments<(ins AnyVectorOfAnyRank:$vector, Variadic<Index>:$position)>,
     Results<(outs AnyType)> {
   let summary = "extract operation";
   let description = [{
@@ -593,19 +593,20 @@ def Vector_ExtractOp :
     ```
   }];
   let builders = [
+    // Convenience builder for a single constant index.
+    OpBuilder<(ins "Value":$source, "int64_t":$position)>,
+    // Convenience builder for constant indices.
     OpBuilder<(ins "Value":$source, "ArrayRef<int64_t>":$position)>,
-    // Convenience builder which assumes the values in `position` are defined by
-    // ConstantIndexOp.
-    OpBuilder<(ins "Value":$source, "ValueRange":$position)>
+    // Convenience builder for single value index.
+    OpBuilder<(ins "Value":$source, "Value":$position)>,
   ];
   let extraClassDeclaration = [{
-    static StringRef getPositionAttrStrName() { return "position"; }
     VectorType getSourceVectorType() {
       return ::llvm::cast<VectorType>(getVector().getType());
     }
     static bool isCompatibleReturnTypes(TypeRange l, TypeRange r);
   }];
-  let assemblyFormat = "$vector `` $position attr-dict `:` type($vector)";
+  let assemblyFormat = "$vector `[` $position `]` attr-dict `:` type($vector)";
   let hasCanonicalizer = 1;
   let hasFolder = 1;
   let hasVerifier = 1;
@@ -695,7 +696,8 @@ def Vector_InsertOp :
      PredOpTrait<"source operand and result have same element type",
                  TCresVTEtIsSameAsOpBase<0, 0>>,
      AllTypesMatch<["dest", "res"]>]>,
-     Arguments<(ins AnyType:$source, AnyVectorOfAnyRank:$dest, I64ArrayAttr:$position)>,
+     Arguments<(ins AnyType:$source, AnyVectorOfAnyRank:$dest,
+                    Variadic<Index>:$position)>,
      Results<(outs AnyVectorOfAnyRank:$res)> {
   let summary = "insert operation";
   let description = [{
@@ -706,24 +708,26 @@ def Vector_InsertOp :
     Example:
 
     ```mlir
-    %2 = vector.insert %0, %1[3] : vector<8x16xf32> into vector<4x8x16xf32>
-    %5 = vector.insert %3, %4[3, 3, 3] : f32 into vector<4x8x16xf32>
+    %2 = vector.insert %0, %1[%c3] : vector<8x16xf32> into vector<4x8x16xf32>
+    %5 = vector.insert %3, %4[%c3, %c3, %c3] : f32 into vector<4x8x16xf32>
     %8 = vector.insert %6, %7[] : f32 into vector<f32>
-    %11 = vector.insert %9, %10[3, 3, 3] : vector<f32> into vector<4x8x16xf32>
+    %11 = vector.insert %9, %10[%c3, %c3, %c3] : vector<f32> into vector<4x8x16xf32>
     ```
   }];
   let assemblyFormat = [{
-    $source `,` $dest $position attr-dict `:` type($source) `into` type($dest)
+    $source `,` $dest `[` $position `]` attr-dict `:` type($source) `into` type($dest)
   }];
 
   let builders = [
+    // Convenience builder for a single constant index.
+    OpBuilder<(ins "Value":$source, "Value":$dest, "int64_t":$position)>,
+    // Convenience builder for constant indices.
     OpBuilder<(ins "Value":$source, "Value":$dest,
       "ArrayRef<int64_t>":$position)>,
-    // Convenience builder which assumes all values are constant indices.
-    OpBuilder<(ins "Value":$source, "Value":$dest, "ValueRange":$position)>
+    // Convenience builder for single value index.
+    OpBuilder<(ins "Value":$source, "Value":$dest, "Value":$position)>,
   ];
   let extraClassDeclaration = [{
-    static StringRef getPositionAttrStrName() { return "position"; }
     Type getSourceType() { return getSource().getType(); }
     VectorType getDestVectorType() {
       return ::llvm::cast<VectorType>(getDest().getType());

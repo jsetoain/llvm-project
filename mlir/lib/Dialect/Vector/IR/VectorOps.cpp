@@ -233,6 +233,31 @@ static LogicalResult incSlicePosition(MutableArrayRef<int64_t> position,
   return failure();
 }
 
+/// Returns the integer numbers in `values`. `values` are expected to be
+/// constant operations.
+SmallVector<int64_t> vector::getAsIntegers(ArrayRef<Value> values) {
+  SmallVector<int64_t> ints;
+  llvm::transform(values, std::back_inserter(ints), [](Value value) {
+    auto constOp = value.getDefiningOp<arith::ConstantIndexOp>();
+    assert(constOp && "Unexpected non-constant index");
+    return constOp.value();
+  });
+  return ints;
+}
+
+/// Returns the constant ops in `values`. `values` are expected to be constant
+/// operations.
+SmallVector<arith::ConstantIndexOp>
+vector::getAsConstantIndexOps(ArrayRef<Value> values) {
+  SmallVector<arith::ConstantIndexOp> constIdxs;
+  llvm::transform(values, std::back_inserter(constIdxs), [](Value value) {
+    auto constOp = value.getDefiningOp<arith::ConstantIndexOp>();
+    assert(constOp && "Unexpected non-constant index");
+    return constOp;
+  });
+  return constIdxs;
+}
+
 //===----------------------------------------------------------------------===//
 // CombiningKindAttr
 //===----------------------------------------------------------------------===//
@@ -394,13 +419,10 @@ struct ElideUnitDimsInMultiDimReduction
     } else {
       // This means we are reducing all the dimensions, and all reduction
       // dimensions are of size 1. So a simple extraction would do.
-      auto zeroAttr =
-          rewriter.getI64ArrayAttr(SmallVector<int64_t>(shape.size(), 0));
       if (mask)
-        mask = rewriter.create<vector::ExtractOp>(loc, rewriter.getI1Type(),
-                                                  mask, zeroAttr);
-      cast = rewriter.create<vector::ExtractOp>(
-          loc, reductionOp.getDestType(), reductionOp.getSource(), zeroAttr);
+        mask = rewriter.create<vector::ExtractOp>(loc, mask, 0);
+      cast =
+          rewriter.create<vector::ExtractOp>(loc, reductionOp.getSource(), 0);
     }
 
     Value result = vector::makeArithReduction(
@@ -568,13 +590,9 @@ struct ElideSingleElementReduction : public OpRewritePattern<ReductionOp> {
         mask = rewriter.create<ExtractElementOp>(loc, mask);
       result = rewriter.create<ExtractElementOp>(loc, reductionOp.getVector());
     } else {
-      if (mask) {
-        mask = rewriter.create<ExtractOp>(loc, rewriter.getI1Type(), mask,
-                                          rewriter.getI64ArrayAttr(0));
-      }
-      result = rewriter.create<ExtractOp>(loc, reductionOp.getType(),
-                                          reductionOp.getVector(),
-                                          rewriter.getI64ArrayAttr(0));
+      if (mask)
+        mask = rewriter.create<ExtractOp>(loc, mask, 0);
+      result = rewriter.create<ExtractOp>(loc, reductionOp.getVector(), 0);
     }
 
     if (Value acc = reductionOp.getAcc())
@@ -1139,18 +1157,23 @@ OpFoldResult vector::ExtractElementOp::fold(FoldAdaptor adaptor) {
 //===----------------------------------------------------------------------===//
 
 void vector::ExtractOp::build(OpBuilder &builder, OperationState &result,
-                              Value source, ArrayRef<int64_t> position) {
-  build(builder, result, source, getVectorSubscriptAttr(builder, position));
+                              Value source, int64_t position) {
+  build(builder, result, source, ArrayRef<int64_t>(position));
 }
 
-// Convenience builder which assumes the values are constant indices.
 void vector::ExtractOp::build(OpBuilder &builder, OperationState &result,
-                              Value source, ValueRange position) {
-  SmallVector<int64_t, 4> positionConstants =
-      llvm::to_vector<4>(llvm::map_range(position, [](Value pos) {
-        return getConstantIntValue(pos).value();
-      }));
-  build(builder, result, source, positionConstants);
+                              Value source, ArrayRef<int64_t> position) {
+  SmallVector<Value> posVals;
+  posVals.reserve(position.size());
+  llvm::transform(position, std::back_inserter(posVals), [&](int64_t pos) {
+    return builder.create<arith::ConstantIndexOp>(result.location, pos);
+  });
+  build(builder, result, source, posVals);
+}
+
+void vector::ExtractOp::build(OpBuilder &builder, OperationState &result,
+                              Value source, Value position) {
+  build(builder, result, source, ValueRange(position));
 }
 
 LogicalResult
@@ -1183,20 +1206,23 @@ bool ExtractOp::isCompatibleReturnTypes(TypeRange l, TypeRange r) {
   return l == r;
 }
 
-LogicalResult vector::ExtractOp::verify() {
-  auto positionAttr = getPosition().getValue();
-  if (positionAttr.size() >
-      static_cast<unsigned>(getSourceVectorType().getRank()))
+LogicalResult ExtractOp::verify() {
+  auto position = getPosition();
+  if (position.size() > static_cast<unsigned>(getSourceVectorType().getRank()))
     return emitOpError(
         "expected position attribute of rank no greater than vector rank");
-  for (const auto &en : llvm::enumerate(positionAttr)) {
-    auto attr = llvm::dyn_cast<IntegerAttr>(en.value());
-    if (!attr || attr.getInt() < 0 ||
-        attr.getInt() >= getSourceVectorType().getDimSize(en.index()))
-      return emitOpError("expected position attribute #")
-             << (en.index() + 1)
-             << " to be a non-negative integer smaller than the corresponding "
-                "vector dimension";
+  for (auto [idx, pos] : llvm::enumerate(position)) {
+    auto constOp = pos.getDefiningOp<arith::ConstantIndexOp>();
+    if (constOp) {
+      if (constOp.value() < 0 ||
+          constOp.value() >= getSourceVectorType().getDimSize(idx)) {
+        return emitOpError("expected position attribute #")
+               << (idx + 1)
+               << " to be a non-negative integer smaller than the "
+                  "corresponding "
+                  "vector dimension";
+      }
+    }
   }
   return success();
 }
@@ -1214,21 +1240,19 @@ static LogicalResult foldExtractOpFromExtractChain(ExtractOp extractOp) {
   if (!extractOp.getVector().getDefiningOp<ExtractOp>())
     return failure();
 
-  SmallVector<int64_t, 4> globalPosition;
+  SmallVector<Value> globalPosition;
   ExtractOp currentOp = extractOp;
-  auto extrPos = extractVector<int64_t>(currentOp.getPosition());
+  SmallVector<Value> extrPos = currentOp.getPosition();
   globalPosition.append(extrPos.rbegin(), extrPos.rend());
   while (ExtractOp nextOp = currentOp.getVector().getDefiningOp<ExtractOp>()) {
     currentOp = nextOp;
-    auto extrPos = extractVector<int64_t>(currentOp.getPosition());
+    extrPos = currentOp.getPosition();
     globalPosition.append(extrPos.rbegin(), extrPos.rend());
   }
-  extractOp.setOperand(currentOp.getVector());
-  // OpBuilder is only used as a helper to build an I64ArrayAttr.
-  OpBuilder b(extractOp.getContext());
-  std::reverse(globalPosition.begin(), globalPosition.end());
-  extractOp->setAttr(ExtractOp::getPositionAttrStrName(),
-                     b.getI64ArrayAttr(globalPosition));
+  SmallVector<Value> newOperands;
+  newOperands.push_back(currentOp.getVector());
+  newOperands.append(globalPosition.rbegin(), globalPosition.rend());
+  extractOp->setOperands(newOperands);
   return success();
 }
 
@@ -1339,7 +1363,8 @@ ExtractFromInsertTransposeChainState::ExtractFromInsertTransposeChainState(
   sentinels.reserve(vectorRank - extractedRank);
   for (int64_t i = 0, e = vectorRank - extractedRank; i < e; ++i)
     sentinels.push_back(-(i + 1));
-  extractPosition = extractVector<int64_t>(extractOp.getPosition());
+  SmallVector<Value> pos = extractOp.getPosition();
+  extractPosition = getAsIntegers(pos);
   llvm::append_range(extractPosition, sentinels);
 }
 
@@ -1359,9 +1384,10 @@ LogicalResult ExtractFromInsertTransposeChainState::handleTransposeOp() {
 LogicalResult
 ExtractFromInsertTransposeChainState::handleInsertOpWithMatchingPos(
     Value &res) {
-  auto insertedPos = extractVector<int64_t>(nextInsertOp.getPosition());
+  SmallVector<Value> pos = nextInsertOp.getPosition();
+  auto insertedPos = getAsIntegers(pos);
   if (ArrayRef(insertedPos) !=
-      llvm::ArrayRef(extractPosition).take_front(extractedRank))
+      ArrayRef(extractPosition).take_front(extractedRank))
     return failure();
   // Case 2.a. early-exit fold.
   res = nextInsertOp.getSource();
@@ -1374,7 +1400,8 @@ ExtractFromInsertTransposeChainState::handleInsertOpWithMatchingPos(
 /// This method updates the internal state.
 LogicalResult
 ExtractFromInsertTransposeChainState::handleInsertOpWithPrefixPos(Value &res) {
-  auto insertedPos = extractVector<int64_t>(nextInsertOp.getPosition());
+  SmallVector<Value> pos = nextInsertOp.getPosition();
+  auto insertedPos = getAsIntegers(pos);
   if (!isContainedWithin(insertedPos, extractPosition))
     return failure();
   // Set leading dims to zero.
@@ -1400,10 +1427,12 @@ Value ExtractFromInsertTransposeChainState::tryToFoldExtractOpInPlace(
     return Value();
   // Otherwise, fold by updating the op inplace and return its result.
   OpBuilder b(extractOp.getContext());
-  extractOp->setAttr(
-      extractOp.getPositionAttrName(),
-      b.getI64ArrayAttr(ArrayRef(extractPosition).take_front(extractedRank)));
-  extractOp.getVectorMutable().assign(source);
+  SmallVector<Value> newOperands;
+  newOperands.push_back(source);
+  for (int64_t index : ArrayRef(extractPosition).take_front(extractedRank))
+    newOperands.push_back(
+        b.create<arith::ConstantIndexOp>(extractOp.getLoc(), index));
+  extractOp->setOperands(newOperands);
   return extractOp.getResult();
 }
 
@@ -1432,7 +1461,8 @@ Value ExtractFromInsertTransposeChainState::fold() {
 
     // Case 4: extractPositionRef intersects insertedPosRef on non-sentinel
     // values. This is a more difficult case and we bail.
-    auto insertedPos = extractVector<int64_t>(nextInsertOp.getPosition());
+    SmallVector<Value> pos = nextInsertOp.getPosition();
+    auto insertedPos = getAsIntegers(pos);
     if (isContainedWithin(extractPosition, insertedPos) ||
         intersectsWhereNonNegative(extractPosition, insertedPos))
       return Value();
@@ -1497,19 +1527,19 @@ static Value foldExtractFromBroadcast(ExtractOp extractOp) {
   // extract position to `0` when extracting from the source operand.
   llvm::SetVector<int64_t> broadcastedUnitDims =
       broadcastOp.computeBroadcastedUnitDims();
-  auto extractPos = extractVector<int64_t>(extractOp.getPosition());
+  SmallVector<Value> extractPos = extractOp.getPosition();
+  OpBuilder b(extractOp);
   for (int64_t i = rankDiff, e = extractPos.size(); i < e; ++i)
     if (broadcastedUnitDims.contains(i))
-      extractPos[i] = 0;
+      extractPos[i] = b.create<arith::ConstantIndexOp>(extractOp.getLoc(), 0);
   // `rankDiff` leading dimensions correspond to new broadcasted dims, drop the
   // matching extract position when extracting from the source operand.
-  extractPos.erase(extractPos.begin(),
-                   std::next(extractPos.begin(), extractPos.size() - rankDiff));
-  // OpBuilder is only used as a helper to build an I64ArrayAttr.
-  OpBuilder b(extractOp.getContext());
-  extractOp.setOperand(source);
-  extractOp->setAttr(ExtractOp::getPositionAttrStrName(),
-                     b.getI64ArrayAttr(extractPos));
+  SmallVector<Value> newOperands;
+  newOperands.push_back(source);
+  newOperands.append(
+      std::next(extractPos.begin(), extractPos.size() - rankDiff),
+      extractPos.end());
+  extractOp->setOperands(newOperands);
   return extractOp.getResult();
 }
 
@@ -1548,7 +1578,8 @@ static Value foldExtractFromShapeCast(ExtractOp extractOp) {
   }
   // Extract the strides associated with the extract op vector source. Then use
   // this to calculate a linearized position for the extract.
-  auto extractedPos = extractVector<int64_t>(extractOp.getPosition());
+  SmallVector<Value> pos = extractOp.getPosition();
+  auto extractedPos = getAsIntegers(pos);
   std::reverse(extractedPos.begin(), extractedPos.end());
   SmallVector<int64_t, 4> strides;
   int64_t stride = 1;
@@ -1572,11 +1603,14 @@ static Value foldExtractFromShapeCast(ExtractOp extractOp) {
   }
   std::reverse(newStrides.begin(), newStrides.end());
   SmallVector<int64_t, 4> newPosition = delinearize(position, newStrides);
-  // OpBuilder is only used as a helper to build an I64ArrayAttr.
-  OpBuilder b(extractOp.getContext());
-  extractOp->setAttr(ExtractOp::getPositionAttrStrName(),
-                     b.getI64ArrayAttr(newPosition));
-  extractOp.setOperand(shapeCastOp.getSource());
+  OpBuilder b(extractOp);
+  SmallVector<Value> newOperands;
+  newOperands.push_back(shapeCastOp.getSource());
+  for (int64_t pos : newPosition) {
+    newOperands.push_back(
+        b.create<arith::ConstantIndexOp>(extractOp.getLoc(), pos));
+  }
+  extractOp->setOperands(newOperands);
   return extractOp.getResult();
 }
 
@@ -1615,15 +1649,20 @@ static Value foldExtractFromExtractStrided(ExtractOp extractOp) {
   if (destinationRank > extractStridedSliceOp.getSourceVectorType().getRank() -
                             sliceOffsets.size())
     return Value();
-  auto extractedPos = extractVector<int64_t>(extractOp.getPosition());
+  SmallVector<Value> valuePos = extractOp.getPosition();
+  auto extractedPos = getAsIntegers(valuePos);
   assert(extractedPos.size() >= sliceOffsets.size());
   for (size_t i = 0, e = sliceOffsets.size(); i < e; i++)
     extractedPos[i] = extractedPos[i] + sliceOffsets[i];
   extractOp.getVectorMutable().assign(extractStridedSliceOp.getVector());
-  // OpBuilder is only used as a helper to build an I64ArrayAttr.
-  OpBuilder b(extractOp.getContext());
-  extractOp->setAttr(ExtractOp::getPositionAttrStrName(),
-                     b.getI64ArrayAttr(extractedPos));
+  OpBuilder b(extractOp);
+  SmallVector<Value> newOperands;
+  newOperands.push_back(extractOp.getVector());
+  for (int64_t pos : extractedPos) {
+    newOperands.push_back(
+        b.create<arith::ConstantIndexOp>(extractOp.getLoc(), pos));
+  }
+  extractOp->setOperands(newOperands);
   return extractOp.getResult();
 }
 
@@ -1648,7 +1687,8 @@ static Value foldExtractStridedOpFromInsertChain(ExtractOp extractOp) {
     if (destinationRank > insertOp.getSourceVectorType().getRank())
       return Value();
     auto insertOffsets = extractVector<int64_t>(insertOp.getOffsets());
-    auto extractOffsets = extractVector<int64_t>(extractOp.getPosition());
+    SmallVector<Value> pos = extractOp.getPosition();
+    auto extractOffsets = getAsIntegers(pos);
 
     if (llvm::any_of(insertOp.getStrides(), [](Attribute attr) {
           return llvm::cast<IntegerAttr>(attr).getInt() != 1;
@@ -1685,11 +1725,13 @@ static Value foldExtractStridedOpFromInsertChain(ExtractOp extractOp) {
                                                     insertRankDiff))
           return Value();
       }
-      extractOp.getVectorMutable().assign(insertOp.getSource());
-      // OpBuilder is only used as a helper to build an I64ArrayAttr.
-      OpBuilder b(extractOp.getContext());
-      extractOp->setAttr(ExtractOp::getPositionAttrStrName(),
-                         b.getI64ArrayAttr(offsetDiffs));
+      SmallVector<Value> newOperands;
+      newOperands.push_back(insertOp.getSource());
+      OpBuilder b(extractOp);
+      for (int64_t offset : offsetDiffs)
+        newOperands.push_back(
+            b.create<arith::ConstantIndexOp>(extractOp.getLoc(), offset));
+      extractOp->setOperands(newOperands);
       return extractOp.getResult();
     }
     // If the chunk extracted is disjoint from the chunk inserted, keep
@@ -1808,8 +1850,9 @@ public:
 
     // Calculate the linearized position of the continuous chunk of elements to
     // extract.
-    llvm::SmallVector<int64_t> completePositions(vecTy.getRank(), 0);
-    copy(getI64SubArray(extractOp.getPosition()), completePositions.begin());
+    SmallVector<int64_t> completePositions(vecTy.getRank(), 0);
+    SmallVector<Value> pos = extractOp.getPosition();
+    llvm::copy(getAsIntegers(pos), completePositions.begin());
     int64_t elemBeginPosition =
         linearize(completePositions, computeStrides(vecTy.getShape()));
     auto denseValuesBegin = dense.value_begin<TypedAttr>() + elemBeginPosition;
@@ -2305,47 +2348,53 @@ OpFoldResult vector::InsertElementOp::fold(FoldAdaptor adaptor) {
 //===----------------------------------------------------------------------===//
 
 void InsertOp::build(OpBuilder &builder, OperationState &result, Value source,
-                     Value dest, ArrayRef<int64_t> position) {
-  result.addOperands({source, dest});
-  auto positionAttr = getVectorSubscriptAttr(builder, position);
-  result.addTypes(dest.getType());
-  result.addAttribute(getPositionAttrStrName(), positionAttr);
+                     Value dest, int64_t position) {
+  build(builder, result, source, dest, ArrayRef<int64_t>(position));
 }
 
-// Convenience builder which assumes the values are constant indices.
 void InsertOp::build(OpBuilder &builder, OperationState &result, Value source,
-                     Value dest, ValueRange position) {
-  SmallVector<int64_t, 4> positionConstants =
-      llvm::to_vector<4>(llvm::map_range(position, [](Value pos) {
-        return getConstantIntValue(pos).value();
-      }));
-  build(builder, result, source, dest, positionConstants);
+                     Value dest, ArrayRef<int64_t> position) {
+  SmallVector<Value> posVals;
+  posVals.reserve(position.size());
+  llvm::transform(position, std::back_inserter(posVals), [&](int64_t pos) {
+    return builder.create<arith::ConstantIndexOp>(result.location, pos);
+  });
+  build(builder, result, source, dest, posVals);
+}
+
+void InsertOp::build(OpBuilder &builder, OperationState &result, Value source,
+                     Value dest, Value position) {
+  build(builder, result, source, dest, ValueRange(position));
 }
 
 LogicalResult InsertOp::verify() {
-  auto positionAttr = getPosition().getValue();
+  SmallVector<Value> position = getPosition();
   auto destVectorType = getDestVectorType();
-  if (positionAttr.size() > static_cast<unsigned>(destVectorType.getRank()))
+  if (position.size() > static_cast<unsigned>(destVectorType.getRank()))
     return emitOpError(
         "expected position attribute of rank no greater than dest vector rank");
   auto srcVectorType = llvm::dyn_cast<VectorType>(getSourceType());
   if (srcVectorType &&
-      (static_cast<unsigned>(srcVectorType.getRank()) + positionAttr.size() !=
+      (static_cast<unsigned>(srcVectorType.getRank()) + position.size() !=
        static_cast<unsigned>(destVectorType.getRank())))
     return emitOpError("expected position attribute rank + source rank to "
                        "match dest vector rank");
   if (!srcVectorType &&
-      (positionAttr.size() != static_cast<unsigned>(destVectorType.getRank())))
+      (position.size() != static_cast<unsigned>(destVectorType.getRank())))
     return emitOpError(
         "expected position attribute rank to match the dest vector rank");
-  for (const auto &en : llvm::enumerate(positionAttr)) {
-    auto attr = llvm::dyn_cast<IntegerAttr>(en.value());
-    if (!attr || attr.getInt() < 0 ||
-        attr.getInt() >= destVectorType.getDimSize(en.index()))
-      return emitOpError("expected position attribute #")
-             << (en.index() + 1)
-             << " to be a non-negative integer smaller than the corresponding "
-                "dest vector dimension";
+  for (auto [idx, pos] : llvm::enumerate(position)) {
+    auto constOp = pos.getDefiningOp<arith::ConstantIndexOp>();
+    if (constOp) {
+      if (constOp.value() < 0 ||
+          constOp.value() >= destVectorType.getDimSize(idx)) {
+        return emitOpError("expected position attribute #")
+               << (idx + 1)
+               << " to be a non-negative integer smaller than the "
+                  "corresponding "
+                  "dest vector dimension";
+      }
+    }
   }
   return success();
 }
@@ -2427,8 +2476,9 @@ public:
 
     // Calculate the linearized position of the continuous chunk of elements to
     // insert.
-    llvm::SmallVector<int64_t> completePositions(destTy.getRank(), 0);
-    copy(getI64SubArray(op.getPosition()), completePositions.begin());
+    SmallVector<int64_t> completePositions(destTy.getRank(), 0);
+    SmallVector<Value> pos = op.getPosition();
+    llvm::copy(getAsIntegers(pos), completePositions.begin());
     int64_t insertBeginPosition =
         linearize(completePositions, computeStrides(destTy.getShape()));
 

@@ -47,6 +47,9 @@ class SmartMutex;
 } // namespace llvm
 
 namespace mlir {
+namespace arith {
+class ConstantOp;
+}
 namespace LLVM {
 class LLVMDialect;
 
